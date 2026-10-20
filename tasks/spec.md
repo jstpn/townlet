@@ -40,23 +40,23 @@ loans, multiple save slots, touch, audio, accounts, any backend.
 
 ## 4. Building
 
-| Item | Size | Cost | Upkeep / month | Radius | Notes |
-|---|---|---|---|---|---|
-| Road | 1 | 10 | 1 | | Dragged in straight axis-aligned lines. Auto-tiles into straight, corner, T, cross, end |
-| Residential zone | 1 | 5 | | | Painted as a rectangle |
-| Commercial zone | 1 | 5 | | | Painted as a rectangle |
-| Industrial zone | 1 | 5 | | | Painted as a rectangle. Emits pollution |
-| Town hall | 2 x 2 | 0 | 0 | 6 | First act of every game. Provides power, water and every service in its radius, and 20 jobs |
-| Wind turbine | 1 | 300 | 20 | 8 | Power |
-| Water tower | 1 | 250 | 15 | 8 | Water |
-| Park | 1 | 100 | 5 | 4 | Happiness and desirability |
-| School | 2 x 2 | 400 | 40 | 10 | |
-| Clinic | 1 | 500 | 50 | 10 | |
-| Fire station | 1 | 450 | 40 | 10 | Fights fires |
-| Police station | 1 | 450 | 40 | 10 | |
-| Tree | 1 | 5 | 0 | | Decoration |
-| Plaza | 1 | 60 | 2 | 2 | Small desirability boost |
-| Bulldoze | | 2 | | | Also clears forest |
+| Item             | Size  | Cost | Upkeep / month | Radius | Notes                                                                                       |
+| ---------------- | ----- | ---- | -------------- | ------ | ------------------------------------------------------------------------------------------- |
+| Road             | 1     | 10   | 1              |        | Dragged in straight axis-aligned lines. Auto-tiles into straight, corner, T, cross, end     |
+| Residential zone | 1     | 5    |                |        | Painted as a rectangle                                                                      |
+| Commercial zone  | 1     | 5    |                |        | Painted as a rectangle                                                                      |
+| Industrial zone  | 1     | 5    |                |        | Painted as a rectangle. Emits pollution                                                     |
+| Town hall        | 2 x 2 | 0    | 0              | 6      | First act of every game. Provides power, water and every service in its radius, and 20 jobs |
+| Wind turbine     | 1     | 300  | 20             | 8      | Power                                                                                       |
+| Water tower      | 1     | 250  | 15             | 8      | Water                                                                                       |
+| Park             | 1     | 100  | 5              | 4      | Happiness and desirability                                                                  |
+| School           | 2 x 2 | 400  | 40             | 10     |                                                                                             |
+| Clinic           | 1     | 500  | 50             | 10     |                                                                                             |
+| Fire station     | 1     | 450  | 40             | 10     | Fights fires                                                                                |
+| Police station   | 1     | 450  | 40             | 10     |                                                                                             |
+| Tree             | 1     | 5    | 0              |        | Decoration                                                                                  |
+| Plaza            | 1     | 60   | 2              | 2      | Small desirability boost                                                                    |
+| Bulldoze         |       | 2    |                |        | Also clears forest                                                                          |
 
 Radius is Chebyshev distance in tiles from any footprint tile. Costs are for
 normal difficulty before the multiplier.
@@ -73,11 +73,11 @@ month. Start: January, year 1.
 
 Each zoned tile holds a level 0 to 3 and an occupancy 0 to 1.
 
-| Zone | Level 1 | Level 2 | Level 3 |
-|---|---|---|---|
-| Residential capacity (residents) | 4 | 12 | 30 |
-| Commercial capacity (jobs) | 3 | 8 | 20 |
-| Industrial capacity (jobs) | 5 | 12 | 25 |
+| Zone                             | Level 1 | Level 2 | Level 3 |
+| -------------------------------- | ------- | ------- | ------- |
+| Residential capacity (residents) | 4       | 12      | 30      |
+| Commercial capacity (jobs)       | 3       | 8       | 20      |
+| Industrial capacity (jobs)       | 5       | 12      | 25      |
 
 Population is the sum of residential capacity times occupancy. Workers are
 population times 0.6. Jobs are commercial plus industrial capacity times
@@ -133,13 +133,13 @@ Economy, settled monthly:
 
 Happiness 0 to 100, recomputed daily as a weighted mean:
 
-| Factor | Score | Weight |
-|---|---|---|
-| Tax | 100 at 0%, 60 at 10%, 0 at 20%, linear between | 2 |
-| Coverage | share of residents with all of school, clinic, police, fire | 2 |
-| Parks | share of residents within a park or plaza radius | 1 |
-| Pollution | 100 minus share of residents on polluted tiles | 2 |
-| Employment | min(1, jobs / workers) | 2 |
+| Factor     | Score                                                       | Weight |
+| ---------- | ----------------------------------------------------------- | ------ |
+| Tax        | 100 at 0%, 60 at 10%, 0 at 20%, linear between              | 2      |
+| Coverage   | share of residents with all of school, clinic, police, fire | 2      |
+| Parks      | share of residents within a park or plaza radius            | 1      |
+| Pollution  | 100 minus share of residents on polluted tiles              | 2      |
+| Employment | min(1, jobs / workers)                                      | 2      |
 
 Residents leave below the leave threshold.
 
@@ -157,16 +157,16 @@ residents; the first of each service; win; game over.
 
 ## 6. Difficulty
 
-| | Easy | Normal | Hard |
-|---|---|---|---|
-| Starting money | 20000 | 10000 | 6000 |
-| Cost multiplier | 0.8 | 1.0 | 1.25 |
-| Upkeep multiplier | 0.8 | 1.0 | 1.3 |
-| Growth rate | 0.10 | 0.08 | 0.06 |
-| Leave threshold (happiness) | 30 | 40 | 50 |
-| Fire chance per month | 0 | 0.15 | 0.5 |
-| Debt limit | none | -5000 | -2000 |
-| Win target (residents) | 2000 | 5000 | 10000 |
+|                             | Easy  | Normal | Hard  |
+| --------------------------- | ----- | ------ | ----- |
+| Starting money              | 20000 | 10000  | 6000  |
+| Cost multiplier             | 0.8   | 1.0    | 1.25  |
+| Upkeep multiplier           | 0.8   | 1.0    | 1.3   |
+| Growth rate                 | 0.10  | 0.08   | 0.06  |
+| Leave threshold (happiness) | 30    | 40     | 50    |
+| Fire chance per month       | 0     | 0.15   | 0.5   |
+| Debt limit                  | none  | -5000  | -2000 |
+| Win target (residents)      | 2000  | 5000   | 10000 |
 
 Winning shows a card and the game continues. Losing shows a card with final
 stats and a new town button. Every value here is tune.

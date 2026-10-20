@@ -1,0 +1,39 @@
+@import '@fontsource-variable/jost';
+
+:root {
+  --paper: #f4ecd8;
+  --paper-2: #ece2c8;
+  --ink: #2b2a28;
+  --ink-soft: #6b665c;
+  --accent: #c4453a;
+  --line: rgba(43, 42, 40, 0.18);
+  --font: 'Jost Variable', 'Futura', 'Avenir Next', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
