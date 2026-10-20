@@ -1,0 +1,36 @@
+# Townlet: todo
+
+Spec: tasks/spec.md. Tick as you go. Review rounds after every 3 or 4 code commits.
+
+## Core
+
+- [ ] 1. Scaffold: Vite, TS strict, ESLint, Prettier, Vitest, Playwright, blank scene renders
+- [ ] 2. Sim: seeded RNG, typed grids, map generation with tests
+- [ ] 3. Render: terrain, water, trees, palette sets, orthographic camera and controls
+- [ ] 4. Roads: sim, auto-tiling, render, drag tool, tests
+- [ ] 5. Zones, building catalogue, placement rules, bulldoze, placeholder meshes, tests
+- [ ] Review round A
+- [ ] 6. Coverage, pollution, demand, growth, occupancy, population, tests
+- [ ] 7. Economy, tax, happiness, debt, win and lose, tests
+- [ ] 8. HUD: start screen, top bar, build menu, info panel, budget, toasts, title cards, pause menu, hints
+- [ ] Review round B
+- [ ] 9. Procedural buildings for every type, level and service; windows; variants
+- [ ] 10. Fire: sim and effects, tests
+- [ ] 11. Cars on the road graph
+- [ ] 12. Autosave and continue, tests
+- [ ] Review round C
+- [ ] 13. Post-processing, day and night polish, postcard
+- [ ] 14. Balance pass with the autoplayer test
+- [ ] 15. Playwright smoke, README with screenshots
+- [ ] Review round D
+
+## Stretch, in order
+
+- [ ] Boats and birds
+- [ ] Hills with terraces
+- [ ] Synthesised audio
+- [ ] Touch controls
+
+## Notes
+
+- Deployment deferred. Joe plays locally for now.

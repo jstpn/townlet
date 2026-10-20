@@ -1,0 +1,21 @@
+{
+  "name": "townlet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A small, beautiful city builder in Wes Anderson palettes.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "e2e": "playwright test"
+  }
+}
