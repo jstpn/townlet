@@ -12,14 +12,13 @@ export class GameRenderer {
   readonly sky: THREE.HemisphereLight;
   private readonly fog: THREE.Fog;
 
-  constructor(
-    readonly canvas: HTMLCanvasElement,
-    palette: Palette,
-  ) {
+  constructor(canvas: HTMLCanvasElement, palette: Palette) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // The sun is static, so the shadow pass only runs when geometry changes.
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.toneMapping = THREE.NoToneMapping;
 
     this.sky = new THREE.HemisphereLight('#ffffff', '#ffffff', 1.1);
@@ -27,12 +26,12 @@ export class GameRenderer {
     this.sun.position.set(MAP_SIZE / 2 - 40, 70, MAP_SIZE / 2 + 30);
     this.sun.target.position.set(MAP_SIZE / 2, 0, MAP_SIZE / 2);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(4096, 4096);
+    this.sun.shadow.mapSize.set(2048, 2048);
     const cam = this.sun.shadow.camera;
-    cam.left = -52;
-    cam.right = 52;
-    cam.top = 52;
-    cam.bottom = -52;
+    cam.left = -48;
+    cam.right = 48;
+    cam.top = 48;
+    cam.bottom = -48;
     cam.near = 1;
     cam.far = 220;
     this.sun.shadow.bias = -0.0004;
@@ -55,6 +54,11 @@ export class GameRenderer {
     this.sun.color.set(palette.sun);
   }
 
+  /** Call after any shadow-casting geometry changes. */
+  requestShadowUpdate(): void {
+    this.renderer.shadowMap.needsUpdate = true;
+  }
+
   readonly resize = (): void => {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -64,5 +68,11 @@ export class GameRenderer {
 
   render(): void {
     this.renderer.render(this.scene, this.rig.camera);
+  }
+
+  dispose(): void {
+    window.removeEventListener('resize', this.resize);
+    this.renderer.setAnimationLoop(null);
+    this.renderer.dispose();
   }
 }

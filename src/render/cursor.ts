@@ -1,15 +1,20 @@
 import * as THREE from 'three';
+import { TILE_COUNT } from '../sim/grid';
+import type { PlanTile } from '../sim/sim';
 
-const CAPACITY = 1024;
+export type PreviewTint = 'build' | 'remove';
 
-/** Translucent tile highlights for the build preview. */
+const OK = new THREE.Color('#ffffff');
+const REMOVE = new THREE.Color('#c4453a');
+const BLOCKED = new THREE.Color('#c4453a');
+
+/** Translucent tile highlights for the build preview, coloured per tile. */
 export class CursorLayer {
-  readonly mesh: THREE.InstancedMesh;
-  private readonly material: THREE.MeshBasicMaterial;
+  readonly object: THREE.InstancedMesh;
   private readonly matrix = new THREE.Matrix4();
 
   constructor() {
-    this.material = new THREE.MeshBasicMaterial({
+    const material = new THREE.MeshBasicMaterial({
       color: '#ffffff',
       transparent: true,
       opacity: 0.45,
@@ -17,26 +22,33 @@ export class CursorLayer {
     });
     const geometry = new THREE.PlaneGeometry(1, 1);
     geometry.rotateX(-Math.PI / 2);
-    this.mesh = new THREE.InstancedMesh(geometry, this.material, CAPACITY);
-    this.mesh.count = 0;
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 10;
+    this.object = new THREE.InstancedMesh(geometry, material, TILE_COUNT);
+    this.object.count = 0;
+    this.object.frustumCulled = false;
+    this.object.renderOrder = 10;
   }
 
-  setTiles(tiles: readonly { x: number; y: number }[], color: string): void {
-    this.material.color.set(color);
+  show(tiles: readonly PlanTile[], tint: PreviewTint): void {
     let n = 0;
-    for (const { x, y } of tiles) {
-      if (n >= CAPACITY) break;
+    for (const { x, y, ok } of tiles) {
+      if (tint === 'remove' && !ok) continue;
       this.matrix.makeTranslation(x + 0.5, 0.08, y + 0.5);
-      this.mesh.setMatrixAt(n, this.matrix);
+      this.object.setMatrixAt(n, this.matrix);
+      this.object.setColorAt(n, tint === 'remove' ? REMOVE : ok ? OK : BLOCKED);
       n++;
     }
-    this.mesh.count = n;
-    this.mesh.instanceMatrix.needsUpdate = true;
+    this.object.count = n;
+    this.object.instanceMatrix.clearUpdateRanges();
+    this.object.instanceMatrix.addUpdateRange(0, n * 16);
+    this.object.instanceMatrix.needsUpdate = true;
+    if (this.object.instanceColor) {
+      this.object.instanceColor.clearUpdateRanges();
+      this.object.instanceColor.addUpdateRange(0, n * 3);
+      this.object.instanceColor.needsUpdate = true;
+    }
   }
 
   clear(): void {
-    this.mesh.count = 0;
+    this.object.count = 0;
   }
 }

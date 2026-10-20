@@ -8,15 +8,13 @@ const CAPACITY = 7000;
 
 /** Low-poly trees on forest tiles: a trunk and two stacked crowns, instanced. */
 export class TreeLayer {
-  readonly group = new THREE.Group();
+  readonly object = new THREE.Group();
   private readonly trunks: THREE.InstancedMesh;
   private readonly lower: THREE.InstancedMesh;
   private readonly upper: THREE.InstancedMesh;
   private readonly trunkMaterial: THREE.MeshStandardMaterial;
-  private palette: Palette;
 
-  constructor(palette: Palette) {
-    this.palette = palette;
+  constructor() {
     this.trunkMaterial = new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.9 });
     const crownMaterial = new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.9 });
     this.trunks = new THREE.InstancedMesh(
@@ -40,23 +38,19 @@ export class TreeLayer {
       mesh.count = 0;
       mesh.frustumCulled = false;
     }
-    this.group.add(this.trunks, this.lower, this.upper);
-  }
-
-  setPalette(palette: Palette): void {
-    this.palette = palette;
+    this.object.add(this.trunks, this.lower, this.upper);
   }
 
   /** Rebuilds every instance from the terrain. Cheap enough to run whenever a tile changes. */
-  rebuild(terrain: Uint8Array): void {
+  rebuild(terrain: Uint8Array, palette: Palette): void {
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
     const scale = new THREE.Vector3();
     const rotation = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
-    const foliage = new THREE.Color(this.palette.foliage);
-    const foliageAlt = new THREE.Color(this.palette.foliageAlt);
-    this.trunkMaterial.color.set(this.palette.trunk);
+    const foliage = new THREE.Color(palette.foliage);
+    const foliageAlt = new THREE.Color(palette.foliageAlt);
+    this.trunkMaterial.color.set(palette.trunk);
     let n = 0;
 
     for (let y = 0; y < MAP_SIZE; y++) {
@@ -91,8 +85,14 @@ export class TreeLayer {
 
     for (const mesh of [this.trunks, this.lower, this.upper]) {
       mesh.count = n;
+      mesh.instanceMatrix.clearUpdateRanges();
+      mesh.instanceMatrix.addUpdateRange(0, n * 16);
       mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      if (mesh.instanceColor) {
+        mesh.instanceColor.clearUpdateRanges();
+        mesh.instanceColor.addUpdateRange(0, n * 3);
+        mesh.instanceColor.needsUpdate = true;
+      }
     }
   }
 }

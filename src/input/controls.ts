@@ -1,50 +1,47 @@
 import type { CameraRig } from '../render/camera';
+import type { Pointer } from './pointer';
 
 const PAN_SPEED = 1.1; // screen heights per second
 const EDGE = 14; // px
 
-/** Mouse and keyboard camera control. Build tools attach separately. */
+/** Camera movement: held keys, edge pan, wheel zoom, middle-drag pan, right-drag rotate. */
 export class CameraControls {
-  private readonly keys = new Set<string>();
-  private pointer = { x: 0, y: 0, inside: false };
-  private drag: { button: number; lastX: number; lastY: number } | undefined;
+  private readonly held = new Set<string>();
+  private drag: { button: 1 | 2; lastX: number; lastY: number } | undefined;
 
   constructor(
     private readonly rig: CameraRig,
+    private readonly pointer: Pointer,
     private readonly element: HTMLElement,
   ) {
-    element.addEventListener('contextmenu', (e) => e.preventDefault());
     element.addEventListener('wheel', this.onWheel, { passive: false });
-    element.addEventListener('pointerdown', this.onPointerDown);
-    window.addEventListener('pointermove', this.onPointerMove);
-    window.addEventListener('pointerup', this.onPointerUp);
-    element.addEventListener('pointerleave', () => (this.pointer.inside = false));
     window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('blur', this.onBlur);
+    pointer.onDown(this.onPointerDown);
+    pointer.onMove(this.onPointerMove);
+    pointer.onUp(this.onPointerUp);
   }
 
-  get pointerNdc(): { x: number; y: number } {
-    return {
-      x: (this.pointer.x / this.element.clientWidth) * 2 - 1,
-      y: -(this.pointer.y / this.element.clientHeight) * 2 + 1,
-    };
+  dispose(): void {
+    this.element.removeEventListener('wheel', this.onWheel);
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onBlur);
   }
 
   update(dt: number): void {
     let right = 0;
     let up = 0;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) right -= 1;
-    if (this.keys.has('d') || this.keys.has('arrowright')) right += 1;
-    if (this.keys.has('w') || this.keys.has('arrowup')) up += 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) up -= 1;
+    if (this.held.has('a') || this.held.has('arrowleft')) right -= 1;
+    if (this.held.has('d') || this.held.has('arrowright')) right += 1;
+    if (this.held.has('w') || this.held.has('arrowup')) up += 1;
+    if (this.held.has('s') || this.held.has('arrowdown')) up -= 1;
     if (this.pointer.inside && !this.drag && document.hasFocus()) {
-      const w = this.element.clientWidth;
-      const h = this.element.clientHeight;
       if (this.pointer.x < EDGE) right -= 1;
-      if (this.pointer.x > w - EDGE) right += 1;
+      if (this.pointer.x > this.element.clientWidth - EDGE) right += 1;
       if (this.pointer.y < EDGE) up += 1;
-      if (this.pointer.y > h - EDGE) up -= 1;
+      if (this.pointer.y > this.element.clientHeight - EDGE) up -= 1;
     }
     if (right !== 0 || up !== 0) {
       const len = Math.hypot(right, up);
@@ -54,25 +51,21 @@ export class CameraControls {
 
   private readonly onWheel = (e: WheelEvent): void => {
     e.preventDefault();
-    const factor = Math.exp(e.deltaY * 0.0012);
-    this.rig.zoomBy(factor, this.pointerNdc);
+    this.rig.zoomBy(Math.exp(e.deltaY * 0.0012), this.pointer.ndc);
   };
 
-  private readonly onPointerDown = (e: PointerEvent): void => {
-    this.pointer = { x: e.clientX, y: e.clientY, inside: true };
-    if (e.button === 1 || e.button === 2) {
-      this.drag = { button: e.button, lastX: e.clientX, lastY: e.clientY };
-      e.preventDefault();
+  private readonly onPointerDown = (button: number): void => {
+    if (button === 1 || button === 2) {
+      this.drag = { button, lastX: this.pointer.x, lastY: this.pointer.y };
     }
   };
 
-  private readonly onPointerMove = (e: PointerEvent): void => {
-    this.pointer = { x: e.clientX, y: e.clientY, inside: true };
+  private readonly onPointerMove = (): void => {
     if (!this.drag) return;
-    const dx = e.clientX - this.drag.lastX;
-    const dy = e.clientY - this.drag.lastY;
-    this.drag.lastX = e.clientX;
-    this.drag.lastY = e.clientY;
+    const dx = this.pointer.x - this.drag.lastX;
+    const dy = this.pointer.y - this.drag.lastY;
+    this.drag.lastX = this.pointer.x;
+    this.drag.lastY = this.pointer.y;
     if (this.drag.button === 2) {
       this.rig.dragYaw += dx * 0.006;
     } else {
@@ -81,17 +74,19 @@ export class CameraControls {
     }
   };
 
-  private readonly onPointerUp = (e: PointerEvent): void => {
-    if (this.drag?.button !== e.button) return;
-    if (this.drag.button === 2) this.rig.commitDrag();
+  private readonly onPointerUp = (button: number): void => {
+    if (this.drag?.button !== button) return;
+    if (button === 2) this.rig.commitDrag();
     this.drag = undefined;
   };
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
-    const key = e.key.toLowerCase();
-    if (e.repeat) return;
-    if (key === 'q') this.rig.rotate(-1);
-    else if (key === 'e') this.rig.rotate(1);
-    else this.keys.add(key);
+    this.held.add(e.key.toLowerCase());
   };
+
+  private readonly onKeyUp = (e: KeyboardEvent): void => {
+    this.held.delete(e.key.toLowerCase());
+  };
+
+  private readonly onBlur = (): void => this.held.clear();
 }

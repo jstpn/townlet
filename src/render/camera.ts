@@ -1,15 +1,17 @@
 import * as THREE from 'three';
-import { MAP_SIZE } from '../sim/grid';
+import { MAP_SIZE, inBounds, type Point } from '../sim/grid';
 
 const PITCH = THREE.MathUtils.degToRad(35.264);
 const DISTANCE = 140;
-export const ZOOM_MIN = 6;
-export const ZOOM_MAX = 44;
+const ZOOM_MIN = 6;
+const ZOOM_MAX = 44;
+const SETTLED = 1e-4;
 
 /** Orthographic camera on a rail: four snap rotations, smooth zoom, a ground target. */
 export class CameraRig {
   readonly camera: THREE.OrthographicCamera;
   readonly target = new THREE.Vector3(MAP_SIZE / 2, 0, MAP_SIZE / 2);
+  /** Which quarter turn the rail sits on, 0 to 3. Zero is the postcard view. */
   rotationIndex = 0;
   /** Half of the visible height in world units. */
   zoom = 20;
@@ -21,6 +23,7 @@ export class CameraRig {
   private aspect = 1;
   private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private readonly raycaster = new THREE.Raycaster();
+  private readonly ndc = new THREE.Vector2();
 
   constructor() {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 400);
@@ -47,11 +50,11 @@ export class CameraRig {
     this.yawTarget += steps * (Math.PI / 2);
   }
 
-  zoomBy(factor: number, anchorNdc?: THREE.Vector2Like): void {
-    const before = anchorNdc ? this.groundPoint(anchorNdc) : undefined;
+  /** Zooms about a screen point, keeping the ground under it still. */
+  zoomBy(factor: number, anchorNdc: THREE.Vector2Like): void {
+    const before = this.groundPoint(anchorNdc);
     this.zoomTarget = THREE.MathUtils.clamp(this.zoomTarget * factor, ZOOM_MIN, ZOOM_MAX);
-    if (!before || !anchorNdc) return;
-    // Keep the ground under the cursor still: move the target by the drift the zoom caused.
+    if (!before) return;
     const savedZoom = this.zoom;
     this.zoom = this.zoomTarget;
     this.apply();
@@ -68,30 +71,36 @@ export class CameraRig {
     const rz = -Math.cos(yaw);
     const fx = -Math.cos(yaw);
     const fz = -Math.sin(yaw);
-    const scale = this.zoom;
-    this.target.x += (rx * right + fx * up) * scale;
-    this.target.z += (rz * right + fz * up) * scale;
-    this.clampTarget();
+    this.target.x += (rx * right + fx * up) * this.zoom;
+    this.target.z += (rz * right + fz * up) * this.zoom;
+    const margin = 6;
+    this.target.x = THREE.MathUtils.clamp(this.target.x, -margin, MAP_SIZE + margin);
+    this.target.z = THREE.MathUtils.clamp(this.target.z, -margin, MAP_SIZE + margin);
   }
 
-  /** World point on the ground plane under a normalised device coordinate, or undefined off-plane. */
+  /** World point on the ground plane under a normalised device coordinate. */
   groundPoint(ndc: THREE.Vector2Like): THREE.Vector3 | undefined {
-    this.raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), this.camera);
+    this.raycaster.setFromCamera(this.ndc.set(ndc.x, ndc.y), this.camera);
     const hit = new THREE.Vector3();
     return this.raycaster.ray.intersectPlane(this.groundPlane, hit) ?? undefined;
+  }
+
+  /** The map tile under a normalised device coordinate, if any. */
+  pickTile(ndc: THREE.Vector2Like): Point | undefined {
+    const point = this.groundPoint(ndc);
+    if (!point) return undefined;
+    const x = Math.floor(point.x);
+    const y = Math.floor(point.z);
+    return inBounds(x, y) ? { x, y } : undefined;
   }
 
   update(dt: number): void {
     const k = 1 - Math.exp(-dt * 10);
     this.yaw += (this.yawTarget - this.yaw) * k;
     this.zoom += (this.zoomTarget - this.zoom) * k;
+    if (Math.abs(this.yawTarget - this.yaw) < SETTLED) this.yaw = this.yawTarget;
+    if (Math.abs(this.zoomTarget - this.zoom) < SETTLED) this.zoom = this.zoomTarget;
     this.apply();
-  }
-
-  private clampTarget(): void {
-    const margin = 6;
-    this.target.x = THREE.MathUtils.clamp(this.target.x, -margin, MAP_SIZE + margin);
-    this.target.z = THREE.MathUtils.clamp(this.target.z, -margin, MAP_SIZE + margin);
   }
 
   private apply(): void {

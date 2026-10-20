@@ -23,8 +23,8 @@ export function hashSeed(seed: string): number {
 }
 
 /** mulberry32: small, fast, good enough for a game. */
-export function createRng(seed: string | number): Rng {
-  let s = typeof seed === 'number' ? seed >>> 0 : hashSeed(seed);
+export function createRng(seed: string): Rng {
+  let s = hashSeed(seed);
   const next = (): number => {
     s = (s + 0x6d2b79f5) >>> 0;
     let t = s;

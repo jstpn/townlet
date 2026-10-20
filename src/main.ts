@@ -1,5 +1,6 @@
 import './style.css';
 import { Game } from './game';
+import { bindKeys } from './input/keymap';
 import { isPaletteName } from './render/palette';
 import { isDifficulty } from './sim/difficulty';
 
@@ -17,9 +18,12 @@ const game = new Game(canvas, {
   palette: isPaletteName(paletteParam) ? paletteParam : 'budapest',
 });
 
-window.addEventListener('keydown', (e) => {
-  if (e.key === '1') game.tool.setTool({ kind: 'road' });
-  if (e.key === 'b') game.tool.setTool({ kind: 'bulldoze' });
+bindKeys({
+  q: () => game.gfx.rig.rotate(-1),
+  e: () => game.gfx.rig.rotate(1),
+  '1': () => game.tool.setTool({ kind: 'road' }),
+  b: () => game.tool.setTool({ kind: 'bulldoze' }),
+  escape: () => game.tool.setTool({ kind: 'none' }),
 });
 
 declare global {

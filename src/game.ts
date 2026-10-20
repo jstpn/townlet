@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import { CameraControls } from './input/controls';
+import { Pointer } from './input/pointer';
 import { BuildTool } from './input/tools';
 import { CursorLayer } from './render/cursor';
+import type { Layer } from './render/layer';
 import { PALETTES, type Palette, type PaletteName } from './render/palette';
 import { GameRenderer } from './render/renderer';
 import { RoadLayer } from './render/roads';
-import { WorldLayers } from './render/world';
+import { TerrainLayer } from './render/terrain';
+import { WaterLayer } from './render/water';
 import type { Difficulty } from './sim/difficulty';
 import { Sim } from './sim/sim';
 
@@ -15,35 +18,40 @@ export type GameOptions = {
   palette: PaletteName;
 };
 
-/** Wires the simulation to the renderer and input. One instance per town. */
+/** Wires the simulation to the renderer and input. One instance per town; dispose before the next. */
 export class Game {
   readonly sim: Sim;
   readonly gfx: GameRenderer;
   readonly tool: BuildTool;
   private palette: Palette;
-  private readonly world: WorldLayers;
-  private readonly roads = new RoadLayer();
+  private readonly layers: Layer[] = [new WaterLayer(), new TerrainLayer(), new RoadLayer()];
   private readonly cursor = new CursorLayer();
+  private readonly pointer: Pointer;
   private readonly controls: CameraControls;
   private readonly clock = new THREE.Clock();
-  private seen = { terrain: -1, roads: -1 };
+  private previewRev = -1;
 
   constructor(canvas: HTMLCanvasElement, options: GameOptions) {
     this.palette = PALETTES[options.palette];
     this.sim = new Sim({ seed: options.seed, difficulty: options.difficulty });
     this.gfx = new GameRenderer(canvas, this.palette);
-    this.world = new WorldLayers(this.sim.state.terrain, this.palette);
-    this.gfx.scene.add(this.world.group, this.roads.mesh, this.cursor.mesh);
-    this.controls = new CameraControls(this.gfx.rig, canvas);
-    this.tool = new BuildTool(this.sim, this.gfx.rig, this.cursor, canvas);
+    for (const layer of this.layers) this.gfx.scene.add(layer.object);
+    this.gfx.scene.add(this.cursor.object);
+    this.pointer = new Pointer(canvas);
+    this.controls = new CameraControls(this.gfx.rig, this.pointer, canvas);
+    this.tool = new BuildTool(this.sim, this.gfx.rig, this.pointer);
     this.gfx.renderer.setAnimationLoop(this.frame);
   }
 
   setPalette(name: PaletteName): void {
     this.palette = PALETTES[name];
     this.gfx.setPalette(this.palette);
-    this.world.setPalette(this.palette);
-    this.seen.roads = -1;
+  }
+
+  dispose(): void {
+    this.controls.dispose();
+    this.pointer.dispose();
+    this.gfx.dispose();
   }
 
   private readonly frame = (): void => {
@@ -54,16 +62,17 @@ export class Game {
     this.gfx.render();
   };
 
-  /** Rebuilds any layer whose sim revision moved since the last frame. */
   private syncLayers(): void {
-    const rev = this.sim.state.rev;
-    if (rev.terrain !== this.seen.terrain) {
-      this.world.setTerrain(this.sim.state.terrain);
-      this.seen.terrain = rev.terrain;
+    let rebuilt = false;
+    for (const layer of this.layers) {
+      if (layer.sync(this.sim.state, this.palette)) rebuilt = true;
     }
-    if (rev.roads !== this.seen.roads) {
-      this.roads.rebuild(this.sim.state.road, this.palette);
-      this.seen.roads = rev.roads;
+    if (rebuilt) this.gfx.requestShadowUpdate();
+    if (this.tool.previewRev !== this.previewRev) {
+      this.previewRev = this.tool.previewRev;
+      const preview = this.tool.preview;
+      if (preview) this.cursor.show(preview.plan.tiles, preview.tint);
+      else this.cursor.clear();
     }
   }
 }

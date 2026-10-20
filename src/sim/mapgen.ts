@@ -1,5 +1,5 @@
 import { createNoise2D } from 'simplex-noise';
-import { MAP_SIZE, TILE_COUNT, idx, largestRegion } from './grid';
+import { DIRS8, MAP_SIZE, TILE_COUNT, idx, inBounds, largestRegionSize } from './grid';
 import { createRng, type Rng } from './rng';
 import { Terrain } from './types';
 
@@ -8,16 +8,16 @@ export type WaterFeature = 'river' | 'lake';
 export type GeneratedMap = {
   terrain: Uint8Array;
   feature: WaterFeature;
-  /** How many internal retries it took to reach the buildable minimum. */
-  variant: number;
 };
 
 const MIN_BUILDABLE = 0.4;
 const MIN_MAINLAND = 0.33;
 const MAX_VARIANTS = 32;
 
+type Noise2D = (x: number, y: number) => number;
+
 /** Fractal noise in [-1, 1]. */
-function fbm(noise: (x: number, y: number) => number, x: number, y: number): number {
+function fbm(noise: Noise2D, x: number, y: number): number {
   let value = 0;
   let amplitude = 1;
   let frequency = 1;
@@ -31,10 +31,16 @@ function fbm(noise: (x: number, y: number) => number, x: number, y: number): num
   return value / total;
 }
 
-function generateVariant(
-  seed: string,
-  variant: number,
-): { terrain: Uint8Array; feature: WaterFeature } {
+function touchesWater(terrain: Uint8Array, x: number, y: number): boolean {
+  for (const [dx, dy] of DIRS8) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (!inBounds(nx, ny) || terrain[idx(nx, ny)] === Terrain.Water) return true;
+  }
+  return false;
+}
+
+function generateVariant(seed: string, variant: number): GeneratedMap {
   const rng = createRng(`${seed}#${variant}`);
   const landNoise = createNoise2D(rng.next);
   const forestNoise = createNoise2D(rng.next);
@@ -58,6 +64,20 @@ function generateVariant(
   ringWithSand(terrain);
   plantForest(terrain, forestNoise);
   return { terrain, feature };
+}
+
+/** Majority filter over the 8-neighbourhood, so coasts lose single-tile specks. */
+function smooth(terrain: Uint8Array): void {
+  const before = Uint8Array.from(terrain);
+  for (let y = 1; y < MAP_SIZE - 1; y++) {
+    for (let x = 1; x < MAP_SIZE - 1; x++) {
+      let land = before[idx(x, y)] === Terrain.Water ? 0 : 1;
+      for (const [dx, dy] of DIRS8) {
+        if (before[idx(x + dx, y + dy)] !== Terrain.Water) land++;
+      }
+      terrain[idx(x, y)] = land >= 5 ? Terrain.Grass : Terrain.Water;
+    }
+  }
 }
 
 /** A gently winding two-tile river straight across the map, so it meets the sea at both ends. */
@@ -104,8 +124,20 @@ function digLake(terrain: Uint8Array, rng: Rng): void {
   }
 }
 
+/** Land that touches water on any of its 8 sides becomes beach. */
+function ringWithSand(terrain: Uint8Array): void {
+  for (let y = 1; y < MAP_SIZE - 1; y++) {
+    for (let x = 1; x < MAP_SIZE - 1; x++) {
+      const tile = idx(x, y);
+      if (terrain[tile] !== Terrain.Water && touchesWater(terrain, x, y)) {
+        terrain[tile] = Terrain.Sand;
+      }
+    }
+  }
+}
+
 /** Forest grows where a second noise layer runs high, only on grass. */
-function plantForest(terrain: Uint8Array, noise: (x: number, y: number) => number): void {
+function plantForest(terrain: Uint8Array, noise: Noise2D): void {
   const scale = 1 / 9;
   for (let y = 0; y < MAP_SIZE; y++) {
     for (let x = 0; x < MAP_SIZE; x++) {
@@ -116,42 +148,8 @@ function plantForest(terrain: Uint8Array, noise: (x: number, y: number) => numbe
   }
 }
 
-/** Land that touches water on any of its 8 sides becomes beach. */
-function ringWithSand(terrain: Uint8Array): void {
-  for (let y = 1; y < MAP_SIZE - 1; y++) {
-    for (let x = 1; x < MAP_SIZE - 1; x++) {
-      if (terrain[idx(x, y)] === Terrain.Water) continue;
-      let shore = false;
-      for (let dy = -1; dy <= 1 && !shore; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (terrain[idx(x + dx, y + dy)] === Terrain.Water) {
-            shore = true;
-            break;
-          }
-        }
-      }
-      if (shore) terrain[idx(x, y)] = Terrain.Sand;
-    }
-  }
-}
-
-/** Majority filter over the 8-neighbourhood, so coasts lose single-tile specks. */
-function smooth(terrain: Uint8Array): void {
-  const before = Uint8Array.from(terrain);
-  for (let y = 1; y < MAP_SIZE - 1; y++) {
-    for (let x = 1; x < MAP_SIZE - 1; x++) {
-      let land = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (before[idx(x + dx, y + dy)] !== Terrain.Water) land++;
-        }
-      }
-      terrain[idx(x, y)] = land >= 5 ? Terrain.Grass : Terrain.Water;
-    }
-  }
-}
-
-function buildableFraction(terrain: Uint8Array): number {
+/** Share of tiles that are not water. */
+export function buildableFraction(terrain: Uint8Array): number {
   let buildable = 0;
   for (const t of terrain) {
     if (t !== Terrain.Water) buildable++;
@@ -160,19 +158,18 @@ function buildableFraction(terrain: Uint8Array): number {
 }
 
 export function generateMap(seed: string): GeneratedMap {
-  let best: GeneratedMap | undefined;
+  let best = generateVariant(seed, 0);
+  let bestFraction = buildableFraction(best.terrain);
   for (let variant = 0; variant < MAX_VARIANTS; variant++) {
-    const candidate = { ...generateVariant(seed, variant), variant };
-    const fraction = buildableFraction(candidate.terrain);
-    const mainland = largestRegion((tile) => candidate.terrain[tile] !== Terrain.Water);
-    if (fraction >= MIN_BUILDABLE && mainland.size / TILE_COUNT >= MIN_MAINLAND) return candidate;
-    if (!best || fraction > buildableFraction(best.terrain)) best = candidate;
+    const candidate = variant === 0 ? best : generateVariant(seed, variant);
+    const fraction = variant === 0 ? bestFraction : buildableFraction(candidate.terrain);
+    const mainland = largestRegionSize((tile) => candidate.terrain[tile] !== Terrain.Water);
+    if (fraction >= MIN_BUILDABLE && mainland / TILE_COUNT >= MIN_MAINLAND) return candidate;
+    if (fraction > bestFraction) {
+      best = candidate;
+      bestFraction = fraction;
+    }
   }
-  // Every variant fell short; return the fullest one rather than fail.
-  return best ?? { ...generateVariant(seed, 0), variant: 0 };
-}
-
-/** A uniform map, for tests and tools. */
-export function flatTerrain(kind: Terrain): Uint8Array {
-  return new Uint8Array(TILE_COUNT).fill(kind);
+  // Every variant fell short; the fullest one is still a playable map.
+  return best;
 }

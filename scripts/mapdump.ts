@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import process from 'node:process';
 import { MAP_SIZE, idx } from '../src/sim/grid';
 import { generateMap } from '../src/sim/mapgen';

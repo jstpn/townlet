@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { idx } from '../src/sim/grid';
-import { flatTerrain } from '../src/sim/mapgen';
-import { ROAD_E, ROAD_N, ROAD_S, ROAD_W, roadConnections } from '../src/sim/roads';
 import { Sim } from '../src/sim/sim';
 import { Terrain } from '../src/sim/types';
+import { flatTerrain } from './helpers';
 
 const newSim = (terrain = flatTerrain(Terrain.Grass)): Sim =>
   new Sim({ seed: 'test', difficulty: 'normal', terrain });
@@ -12,17 +11,14 @@ describe('roads', () => {
   it('places a road on grass and charges for it', () => {
     const sim = newSim();
     const before = sim.state.money;
-    const result = sim.placeRoad(10, 10);
-    expect(result).toEqual({ ok: true, cost: 10 });
+    expect(sim.placeRoadLine(10, 10, 10, 10)).toEqual({ ok: true, cost: 10 });
     expect(sim.state.road[idx(10, 10)]).toBe(1);
     expect(sim.state.money).toBe(before - 10);
   });
-});
 
-describe('road lines', () => {
   it('refuses water and reports why', () => {
     const sim = newSim(flatTerrain(Terrain.Water));
-    expect(sim.placeRoad(10, 10)).toEqual({ ok: false, reason: 'water' });
+    expect(sim.placeRoadLine(10, 10, 10, 10)).toEqual({ ok: false, reason: 'water' });
     expect(sim.state.road[idx(10, 10)]).toBe(0);
   });
 
@@ -34,9 +30,11 @@ describe('road lines', () => {
     expect(sim.state.road[idx(4, 7)]).toBe(1);
   });
 
-  it('rejects a diagonal line', () => {
+  it('snaps a diagonal drag onto the axis that moved most', () => {
     const sim = newSim();
-    expect(sim.placeRoadLine(2, 5, 6, 8)).toEqual({ ok: false, reason: 'not-a-line' });
+    expect(sim.placeRoadLine(2, 5, 6, 8)).toEqual({ ok: true, cost: 50 });
+    for (let x = 2; x <= 6; x++) expect(sim.state.road[idx(x, 5)]).toBe(1);
+    expect(sim.state.road[idx(6, 8)]).toBe(0);
   });
 
   it('skips water tiles inside a line rather than failing the whole line', () => {
@@ -46,6 +44,22 @@ describe('road lines', () => {
     expect(sim.placeRoadLine(2, 5, 6, 5)).toEqual({ ok: true, cost: 40 });
     expect(sim.state.road[idx(4, 5)]).toBe(0);
   });
+
+  it('previews a line with the tiles that will build and the price, without changing anything', () => {
+    const terrain = flatTerrain(Terrain.Grass);
+    terrain[idx(3, 5)] = Terrain.Water;
+    const sim = newSim(terrain);
+    const plan = sim.planRoadLine(2, 5, 4, 5);
+    expect(plan).toEqual({
+      tiles: [
+        { x: 2, y: 5, ok: true },
+        { x: 3, y: 5, ok: false },
+        { x: 4, y: 5, ok: true },
+      ],
+      cost: 20,
+    });
+    expect(sim.state.road[idx(2, 5)]).toBe(0);
+  });
 });
 
 describe('roads and the land', () => {
@@ -53,36 +67,32 @@ describe('roads and the land', () => {
     const terrain = flatTerrain(Terrain.Grass);
     terrain[idx(3, 3)] = Terrain.Forest;
     const sim = newSim(terrain);
-    expect(sim.placeRoad(3, 3)).toEqual({ ok: true, cost: 12 });
+    expect(sim.placeRoadLine(3, 3, 3, 3)).toEqual({ ok: true, cost: 12 });
     expect(sim.state.terrain[idx(3, 3)]).toBe(Terrain.Grass);
   });
 
   it('refuses when the town cannot afford it', () => {
-    const sim = new Sim({ seed: 't', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass), money: 25 });
+    const sim = new Sim({
+      seed: 't',
+      difficulty: 'normal',
+      terrain: flatTerrain(Terrain.Grass),
+      money: 25,
+    });
     expect(sim.placeRoadLine(0, 0, 0, 2)).toEqual({ ok: false, reason: 'insufficient-funds' });
     expect(sim.state.money).toBe(25);
   });
 
-  it('bulldozes a road for a small fee', () => {
-    const sim = newSim();
-    sim.placeRoad(5, 5);
+  it('bulldozes roads and forest in a rectangle for a fee per cleared tile', () => {
+    const terrain = flatTerrain(Terrain.Grass);
+    terrain[idx(6, 6)] = Terrain.Forest;
+    const sim = newSim(terrain);
+    sim.placeRoadLine(5, 5, 5, 6);
     const money = sim.state.money;
-    expect(sim.bulldoze(5, 5)).toEqual({ ok: true, cost: 2 });
+    expect(sim.bulldozeRect(5, 5, 6, 6)).toEqual({ ok: true, cost: 6 });
     expect(sim.state.road[idx(5, 5)]).toBe(0);
-    expect(sim.state.money).toBe(money - 2);
-    expect(sim.bulldoze(5, 5)).toEqual({ ok: false, reason: 'nothing-to-build' });
-  });
-});
-
-describe('road connections', () => {
-  it('reports which neighbours a road tile joins, as N E S W bits', () => {
-    const sim = newSim();
-    sim.placeRoadLine(2, 5, 6, 5);
-    sim.placeRoadLine(4, 5, 4, 7);
-    expect(roadConnections(sim.state.road, 3, 5)).toBe(ROAD_E | ROAD_W);
-    expect(roadConnections(sim.state.road, 4, 5)).toBe(ROAD_E | ROAD_W | ROAD_S);
-    expect(roadConnections(sim.state.road, 2, 5)).toBe(ROAD_E);
-    expect(roadConnections(sim.state.road, 4, 7)).toBe(ROAD_N);
-    expect(roadConnections(sim.state.road, 0, 0)).toBe(0);
+    expect(sim.state.road[idx(5, 6)]).toBe(0);
+    expect(sim.state.terrain[idx(6, 6)]).toBe(Terrain.Grass);
+    expect(sim.state.money).toBe(money - 6);
+    expect(sim.bulldozeRect(5, 5, 6, 6)).toEqual({ ok: false, reason: 'nothing-to-build' });
   });
 });
