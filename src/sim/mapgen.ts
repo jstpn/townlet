@@ -171,3 +171,8 @@ export function generateMap(seed: string): GeneratedMap {
   // Every variant fell short; return the fullest one rather than fail.
   return best ?? { ...generateVariant(seed, 0), variant: 0 };
 }
+
+/** A uniform map, for tests and tools. */
+export function flatTerrain(kind: Terrain): Uint8Array {
+  return new Uint8Array(TILE_COUNT).fill(kind);
+}

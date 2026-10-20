@@ -1,27 +1,32 @@
 import './style.css';
-import * as THREE from 'three';
-import { CameraControls } from './input/controls';
-import { PALETTES } from './render/palette';
-import { GameRenderer } from './render/renderer';
-import { WorldLayers } from './render/world';
-import { generateMap } from './sim/mapgen';
+import { Game } from './game';
+import { isPaletteName } from './render/palette';
+import { isDifficulty } from './sim/difficulty';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene');
 if (!canvas) {
   throw new Error('missing #scene canvas');
 }
 
-const palette = PALETTES.budapest;
-const map = generateMap('budapest');
-const gfx = new GameRenderer(canvas, palette);
-const world = new WorldLayers(map.terrain, palette);
-gfx.scene.add(world.group);
-const controls = new CameraControls(gfx.rig, canvas);
-
-const clock = new THREE.Clock();
-gfx.renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.1);
-  controls.update(dt);
-  gfx.rig.update(dt);
-  gfx.render();
+const params = new URLSearchParams(window.location.search);
+const paletteParam = params.get('palette') ?? '';
+const difficultyParam = params.get('difficulty') ?? '';
+const game = new Game(canvas, {
+  seed: params.get('seed') ?? 'budapest',
+  difficulty: isDifficulty(difficultyParam) ? difficultyParam : 'normal',
+  palette: isPaletteName(paletteParam) ? paletteParam : 'budapest',
 });
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === '1') game.tool.setTool({ kind: 'road' });
+  if (e.key === 'b') game.tool.setTool({ kind: 'bulldoze' });
+});
+
+declare global {
+  // Global augmentation must be an interface.
+  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+  interface Window {
+    townlet: Game;
+  }
+}
+window.townlet = game;
