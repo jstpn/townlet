@@ -52,9 +52,9 @@ describe('roads', () => {
     const plan = sim.planRoadLine(2, 5, 4, 5);
     expect(plan).toEqual({
       tiles: [
-        { x: 2, y: 5, ok: true },
-        { x: 3, y: 5, ok: false },
-        { x: 4, y: 5, ok: true },
+        { x: 2, y: 5, status: 'change' },
+        { x: 3, y: 5, status: 'blocked' },
+        { x: 4, y: 5, status: 'change' },
       ],
       cost: 20,
     });
@@ -94,5 +94,53 @@ describe('roads and the land', () => {
     expect(sim.state.terrain[idx(6, 6)]).toBe(Terrain.Grass);
     expect(sim.state.money).toBe(money - 6);
     expect(sim.bulldozeRect(5, 5, 6, 6)).toEqual({ ok: false, reason: 'nothing-to-build' });
+  });
+});
+
+describe('revision counters', () => {
+  it('bump roads once per road command and terrain only when forest is cleared', () => {
+    const terrain = flatTerrain(Terrain.Grass);
+    terrain[idx(8, 5)] = Terrain.Forest;
+    const sim = newSim(terrain);
+    const before = { ...sim.state.rev };
+    sim.placeRoadLine(2, 5, 6, 5);
+    expect(sim.state.rev.roads).toBeGreaterThan(before.roads);
+    expect(sim.state.rev.terrain).toBe(before.terrain);
+    const afterFirst = { ...sim.state.rev };
+    sim.placeRoadLine(4, 5, 8, 5);
+    expect(sim.state.rev.roads).toBeGreaterThan(afterFirst.roads);
+    expect(sim.state.rev.terrain).toBeGreaterThan(afterFirst.terrain);
+  });
+
+  it('stay put when a command is refused', () => {
+    const sim = newSim(flatTerrain(Terrain.Water));
+    const before = { ...sim.state.rev };
+    sim.placeRoadLine(2, 5, 6, 5);
+    sim.bulldozeRect(2, 5, 6, 5);
+    expect(sim.state.rev).toEqual(before);
+  });
+
+  it('mark existing road as kept, so a repeated line changes nothing and bumps nothing', () => {
+    const sim = newSim();
+    sim.placeRoadLine(2, 5, 6, 5);
+    const rev = { ...sim.state.rev };
+    const plan = sim.planRoadLine(2, 5, 6, 5);
+    expect(plan.error).toBe('nothing-to-build');
+    expect(plan.tiles.every((t) => t.status === 'keep')).toBe(true);
+    sim.placeRoadLine(2, 5, 6, 5);
+    expect(sim.state.rev).toEqual(rev);
+  });
+});
+
+describe('difficulty', () => {
+  it('sets the starting money and scales prices with rounding', () => {
+    const grass = flatTerrain(Terrain.Grass);
+    const easy = new Sim({ seed: 't', difficulty: 'easy', terrain: grass });
+    const hard = new Sim({ seed: 't', difficulty: 'hard', terrain: grass });
+    expect(easy.state.money).toBe(20000);
+    expect(hard.state.money).toBe(6000);
+    expect(easy.placeRoadLine(1, 1, 1, 1)).toEqual({ ok: true, cost: 8 });
+    expect(hard.placeRoadLine(1, 1, 1, 1)).toEqual({ ok: true, cost: 13 });
+    expect(hard.bulldozeRect(1, 1, 1, 1)).toEqual({ ok: true, cost: 3 });
   });
 });

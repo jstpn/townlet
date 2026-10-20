@@ -4,7 +4,8 @@ import type { PlanTile } from '../sim/sim';
 
 export type PreviewTint = 'build' | 'remove';
 
-const OK = new THREE.Color('#ffffff');
+const CHANGE = new THREE.Color('#ffffff');
+const KEEP = new THREE.Color('#ffffff');
 const REMOVE = new THREE.Color('#c4453a');
 const BLOCKED = new THREE.Color('#c4453a');
 
@@ -30,11 +31,19 @@ export class CursorLayer {
 
   show(tiles: readonly PlanTile[], tint: PreviewTint): void {
     let n = 0;
-    for (const { x, y, ok } of tiles) {
-      if (tint === 'remove' && !ok) continue;
+    for (const { x, y, status } of tiles) {
+      if (status === 'keep' && tint === 'remove') continue;
       this.matrix.makeTranslation(x + 0.5, 0.08, y + 0.5);
       this.object.setMatrixAt(n, this.matrix);
-      this.object.setColorAt(n, tint === 'remove' ? REMOVE : ok ? OK : BLOCKED);
+      const color =
+        status === 'blocked'
+          ? BLOCKED
+          : tint === 'remove'
+            ? REMOVE
+            : status === 'keep'
+              ? KEEP
+              : CHANGE;
+      this.object.setColorAt(n, color);
       n++;
     }
     this.object.count = n;

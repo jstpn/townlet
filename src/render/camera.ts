@@ -40,42 +40,49 @@ export class CameraRig {
     this.yawTarget += (direction * Math.PI) / 2;
   }
 
-  /** Snaps the drag rotation to the nearest quarter turn and folds it into the rail. */
+  /** Ends a drag rotation: the view keeps its dragged angle and eases onto the nearest quarter turn. */
   commitDrag(): void {
     const steps = Math.round(this.dragYaw / (Math.PI / 2));
+    this.yaw += this.dragYaw;
     this.dragYaw = 0;
-    if (steps === 0) return;
     this.rotationIndex = (((this.rotationIndex + steps) % 4) + 4) % 4;
-    this.yaw += steps * (Math.PI / 2);
     this.yawTarget += steps * (Math.PI / 2);
   }
 
-  /** Zooms about a screen point, keeping the ground under it still. */
+  /**
+   * Zooms about a screen point, keeping the ground under it still. Both samples use the settled
+   * zoom, so repeated wheel ticks during the easing do not let the anchor drift.
+   */
   zoomBy(factor: number, anchorNdc: THREE.Vector2Like): void {
+    const savedZoom = this.zoom;
+    this.zoom = this.zoomTarget;
+    this.apply();
     const before = this.groundPoint(anchorNdc);
     this.zoomTarget = THREE.MathUtils.clamp(this.zoomTarget * factor, ZOOM_MIN, ZOOM_MAX);
-    if (!before) return;
-    const savedZoom = this.zoom;
     this.zoom = this.zoomTarget;
     this.apply();
     const after = this.groundPoint(anchorNdc);
     this.zoom = savedZoom;
-    if (after) this.target.add(before.sub(after));
+    if (before && after) this.target.add(before.sub(after));
     this.apply();
   }
 
-  /** Pans in screen terms: right and up on the screen, scaled to the current zoom. */
+  /** Pans in screen terms: right and up on the screen as fractions of the view, so the ground tracks the cursor. */
   pan(right: number, up: number): void {
     const yaw = this.yaw + this.dragYaw;
     const rx = Math.sin(yaw);
     const rz = -Math.cos(yaw);
     const fx = -Math.cos(yaw);
     const fz = -Math.sin(yaw);
-    this.target.x += (rx * right + fx * up) * this.zoom;
-    this.target.z += (rz * right + fz * up) * this.zoom;
+    // The ground-forward axis is foreshortened by the pitch, so it needs more world distance per screen unit.
+    const forward = (up * this.zoom) / Math.sin(PITCH);
+    const sideways = right * this.zoom;
+    this.target.x += rx * sideways + fx * forward;
+    this.target.z += rz * sideways + fz * forward;
     const margin = 6;
     this.target.x = THREE.MathUtils.clamp(this.target.x, -margin, MAP_SIZE + margin);
     this.target.z = THREE.MathUtils.clamp(this.target.z, -margin, MAP_SIZE + margin);
+    this.apply();
   }
 
   /** World point on the ground plane under a normalised device coordinate. */
@@ -83,6 +90,12 @@ export class CameraRig {
     this.raycaster.setFromCamera(this.ndc.set(ndc.x, ndc.y), this.camera);
     const hit = new THREE.Vector3();
     return this.raycaster.ray.intersectPlane(this.groundPlane, hit) ?? undefined;
+  }
+
+  /** Screen position (normalised device coordinates) of a ground point. */
+  project(x: number, z: number): { x: number; y: number } {
+    const v = new THREE.Vector3(x, 0, z).project(this.camera);
+    return { x: v.x, y: v.y };
   }
 
   /** The map tile under a normalised device coordinate, if any. */

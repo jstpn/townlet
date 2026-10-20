@@ -12,7 +12,10 @@ export class GameRenderer {
   readonly sky: THREE.HemisphereLight;
   private readonly fog: THREE.Fog;
 
-  constructor(canvas: HTMLCanvasElement, palette: Palette) {
+  constructor(
+    readonly canvas: HTMLCanvasElement,
+    palette: Palette,
+  ) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;

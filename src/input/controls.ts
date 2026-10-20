@@ -81,6 +81,12 @@ export class CameraControls {
   };
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
+    // Shortcuts with modifiers belong to the browser, and macOS drops the matching keyup, so
+    // a modifier press releases everything rather than leaving a key stuck.
+    if (e.metaKey || e.ctrlKey || e.altKey) {
+      this.held.clear();
+      return;
+    }
     this.held.add(e.key.toLowerCase());
   };
 
@@ -88,5 +94,9 @@ export class CameraControls {
     this.held.delete(e.key.toLowerCase());
   };
 
-  private readonly onBlur = (): void => this.held.clear();
+  private readonly onBlur = (): void => {
+    this.held.clear();
+    if (this.drag?.button === 2) this.rig.commitDrag();
+    this.drag = undefined;
+  };
 }

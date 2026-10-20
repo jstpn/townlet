@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DIRS8, MAP_SIZE, idx, largestRegionSize } from '../src/sim/grid';
-import { buildableFraction, generateMap } from '../src/sim/mapgen';
+import { buildableFraction, carveRiver, digLake, generateMap } from '../src/sim/mapgen';
+import { createRng } from '../src/sim/rng';
+import { flatTerrain } from './helpers';
 import { Terrain } from '../src/sim/types';
 
 describe('generateMap', () => {
@@ -62,20 +64,54 @@ describe('generateMap forest', () => {
 });
 
 describe('generateMap water feature', () => {
-  it('cuts a river or a lake into the interior', () => {
+  it('picks both rivers and lakes across seeds', () => {
     const seen = new Set<string>();
-    for (let i = 0; i < 12; i++) {
-      const map = generateMap(`feature-${i}`);
-      seen.add(map.feature);
-      let interiorWater = 0;
-      for (let y = 14; y < MAP_SIZE - 14; y++) {
-        for (let x = 14; x < MAP_SIZE - 14; x++) {
-          if (map.terrain[idx(x, y)] === Terrain.Water) interiorWater++;
+    for (let i = 0; i < 12; i++) seen.add(generateMap(`feature-${i}`).feature);
+    expect([...seen].sort()).toEqual(['lake', 'river']);
+  });
+
+  it('carves a river two tiles wide across the whole map', () => {
+    for (let i = 0; i < 6; i++) {
+      const terrain = flatTerrain(Terrain.Grass);
+      carveRiver(terrain, createRng(`river-${i}`));
+      const rows = new Set<number>();
+      const cols = new Set<number>();
+      let water = 0;
+      for (let y = 0; y < MAP_SIZE; y++) {
+        for (let x = 0; x < MAP_SIZE; x++) {
+          if (terrain[idx(x, y)] !== Terrain.Water) continue;
+          water++;
+          rows.add(y);
+          cols.add(x);
         }
       }
-      expect(interiorWater, `feature-${i}`).toBeGreaterThanOrEqual(25);
+      // Every row or every column has river in it, so it reaches both edges.
+      expect(rows.size === MAP_SIZE || cols.size === MAP_SIZE, `river-${i}`).toBe(true);
+      expect(water, `river-${i}`).toBeGreaterThanOrEqual(MAP_SIZE * 2 - 4);
+      expect(water, `river-${i}`).toBeLessThanOrEqual(MAP_SIZE * 2);
     }
-    expect([...seen].sort()).toEqual(['lake', 'river']);
+  });
+
+  it('digs a lake as one blob well inside the map', () => {
+    for (let i = 0; i < 6; i++) {
+      const terrain = flatTerrain(Terrain.Grass);
+      digLake(terrain, createRng(`lake-${i}`));
+      let water = 0;
+      for (let y = 0; y < MAP_SIZE; y++) {
+        for (let x = 0; x < MAP_SIZE; x++) {
+          if (terrain[idx(x, y)] !== Terrain.Water) continue;
+          water++;
+          expect(
+            x > 4 && x < MAP_SIZE - 5 && y > 4 && y < MAP_SIZE - 5,
+            `lake-${i} at ${x},${y}`,
+          ).toBe(true);
+        }
+      }
+      expect(water, `lake-${i}`).toBeGreaterThanOrEqual(30);
+      expect(water, `lake-${i}`).toBeLessThanOrEqual(200);
+      const blob = largestRegionSize((tile) => terrain[tile] === Terrain.Water);
+      expect(blob, `lake-${i}`).toBe(water);
+    }
   });
 });
 

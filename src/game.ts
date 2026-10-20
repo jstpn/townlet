@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CameraControls } from './input/controls';
+import { bindKeys } from './input/keymap';
 import { Pointer } from './input/pointer';
 import { BuildTool } from './input/tools';
 import { CursorLayer } from './render/cursor';
@@ -29,6 +30,7 @@ export class Game {
   private readonly pointer: Pointer;
   private readonly controls: CameraControls;
   private readonly clock = new THREE.Clock();
+  private readonly unbindKeys: () => void;
   private previewRev = -1;
 
   constructor(canvas: HTMLCanvasElement, options: GameOptions) {
@@ -40,7 +42,23 @@ export class Game {
     this.pointer = new Pointer(canvas);
     this.controls = new CameraControls(this.gfx.rig, this.pointer, canvas);
     this.tool = new BuildTool(this.sim, this.gfx.rig, this.pointer);
+    this.unbindKeys = bindKeys({
+      q: () => this.gfx.rig.rotate(-1),
+      e: () => this.gfx.rig.rotate(1),
+      '1': () => this.tool.setTool({ kind: 'road' }),
+      b: () => this.tool.setTool({ kind: 'bulldoze' }),
+      escape: () => this.tool.setTool({ kind: 'none' }),
+    });
     this.gfx.renderer.setAnimationLoop(this.frame);
+  }
+
+  /** Client pixel position of a tile's centre, for tests and labels. */
+  tileToScreen(x: number, y: number): { x: number; y: number } {
+    const ndc = this.gfx.rig.project(x + 0.5, y + 0.5);
+    return {
+      x: ((ndc.x + 1) / 2) * this.gfx.canvas.clientWidth,
+      y: ((1 - ndc.y) / 2) * this.gfx.canvas.clientHeight,
+    };
   }
 
   setPalette(name: PaletteName): void {
@@ -49,6 +67,7 @@ export class Game {
   }
 
   dispose(): void {
+    this.unbindKeys();
     this.controls.dispose();
     this.pointer.dispose();
     this.gfx.dispose();
@@ -58,6 +77,7 @@ export class Game {
     const dt = Math.min(this.clock.getDelta(), 0.1);
     this.controls.update(dt);
     this.gfx.rig.update(dt);
+    this.tool.update();
     this.syncLayers();
     this.gfx.render();
   };

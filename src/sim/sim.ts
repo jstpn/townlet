@@ -18,8 +18,10 @@ export type CommandError =
 
 export type CommandResult = { ok: true; cost: number } | { ok: false; reason: CommandError };
 
-/** One tile of a planned command: `ok` tiles will change, the rest are shown but skipped. */
-export type PlanTile = { x: number; y: number; ok: boolean };
+export type PlanStatus = 'change' | 'keep' | 'blocked';
+
+/** One tile of a planned command: `change` tiles will be altered, `keep` stays as is, `blocked` cannot. */
+export type PlanTile = { x: number; y: number; status: PlanStatus };
 
 /** What a command would do, priced, so the UI can preview it before committing. */
 export type Plan = { tiles: PlanTile[]; cost: number; error?: CommandError };
@@ -60,18 +62,22 @@ export class Sim {
     const end = snapToAxis({ x: x0, y: y0 }, { x: x1, y: y1 });
     const tiles = lineTiles(x0, y0, end.x, end.y);
     let cost = 0;
-    let newRoad = 0;
-    const planned = tiles.map((tile) => {
-      const ok = this.state.terrain[tile] !== Terrain.Water;
-      if (ok && this.state.road[tile] === 0) {
-        newRoad++;
-        cost += this.price(ROAD_COST) + this.clearingFee(tile);
-      }
-      return { x: xOf(tile), y: yOf(tile), ok };
+    const planned = tiles.map((tile): PlanTile => {
+      const status: PlanStatus =
+        this.state.terrain[tile] === Terrain.Water
+          ? 'blocked'
+          : this.state.road[tile] === 1
+            ? 'keep'
+            : 'change';
+      if (status === 'change') cost += this.price(ROAD_COST) + this.clearingFee(tile);
+      return { x: xOf(tile), y: yOf(tile), status };
     });
     if (tiles.length === 0) return { tiles: planned, cost, error: 'out-of-bounds' };
-    if (!planned.some((t) => t.ok)) return { tiles: planned, cost, error: 'water' };
-    if (newRoad === 0) return { tiles: planned, cost, error: 'nothing-to-build' };
+    if (planned.every((t) => t.status === 'blocked'))
+      return { tiles: planned, cost, error: 'water' };
+    if (!planned.some((t) => t.status === 'change')) {
+      return { tiles: planned, cost, error: 'nothing-to-build' };
+    }
     return this.priced(planned, cost);
   }
 
@@ -85,12 +91,15 @@ export class Sim {
 
   /** Clears road and forest from every tile in a rectangle, for a flat fee per cleared tile. */
   planBulldozeRect(x0: number, y0: number, x1: number, y1: number): Plan {
-    const planned = rectTiles(x0, y0, x1, y1).map((tile) => ({
+    const planned = rectTiles(x0, y0, x1, y1).map((tile): PlanTile => ({
       x: xOf(tile),
       y: yOf(tile),
-      ok: this.state.road[tile] === 1 || this.state.terrain[tile] === Terrain.Forest,
+      status:
+        this.state.road[tile] === 1 || this.state.terrain[tile] === Terrain.Forest
+          ? 'change'
+          : 'keep',
     }));
-    const count = planned.filter((t) => t.ok).length;
+    const count = planned.filter((t) => t.status === 'change').length;
     if (planned.length === 0) return { tiles: planned, cost: 0, error: 'out-of-bounds' };
     if (count === 0) return { tiles: planned, cost: 0, error: 'nothing-to-build' };
     return this.priced(planned, count * this.price(BULLDOZE_COST));
@@ -118,12 +127,12 @@ export class Sim {
     return cost > this.state.money ? { tiles, cost, error: 'insufficient-funds' } : { tiles, cost };
   }
 
-  /** Charges for a plan and applies it to every ok tile. Plans with an error change nothing. */
+  /** Charges for a plan and applies it to every changing tile. Plans with an error change nothing. */
   private execute(plan: Plan, apply: (tile: number) => void): CommandResult {
     if (plan.error) return { ok: false, reason: plan.error };
     this.state.money -= plan.cost;
     for (const t of plan.tiles) {
-      if (t.ok && inBounds(t.x, t.y)) apply(idx(t.x, t.y));
+      if (t.status === 'change' && inBounds(t.x, t.y)) apply(idx(t.x, t.y));
     }
     return { ok: true, cost: plan.cost };
   }

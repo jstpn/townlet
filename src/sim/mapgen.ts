@@ -1,5 +1,15 @@
 import { createNoise2D } from 'simplex-noise';
-import { DIRS8, MAP_SIZE, TILE_COUNT, idx, inBounds, largestRegionSize } from './grid';
+import {
+  DIRS4,
+  DIRS8,
+  MAP_SIZE,
+  TILE_COUNT,
+  idx,
+  inBounds,
+  largestRegionSize,
+  xOf,
+  yOf,
+} from './grid';
 import { createRng, type Rng } from './rng';
 import { Terrain } from './types';
 
@@ -81,7 +91,7 @@ function smooth(terrain: Uint8Array): void {
 }
 
 /** A gently winding two-tile river straight across the map, so it meets the sea at both ends. */
-function carveRiver(terrain: Uint8Array, rng: Rng): void {
+export function carveRiver(terrain: Uint8Array, rng: Rng): void {
   const vertical = rng.chance(0.5);
   const centre = MAP_SIZE / 2 + rng.int(17) - 8;
   const amplitude = 4 + rng.int(5);
@@ -99,8 +109,8 @@ function carveRiver(terrain: Uint8Array, rng: Rng): void {
   }
 }
 
-/** A lake with a noisy edge, dug somewhere on land in the middle of the map. */
-function digLake(terrain: Uint8Array, rng: Rng): void {
+/** A lake with a noisy edge, dug somewhere on land in the middle of the map, always in one piece. */
+export function digLake(terrain: Uint8Array, rng: Rng): void {
   const margin = 16;
   let cx = MAP_SIZE / 2;
   let cy = MAP_SIZE / 2;
@@ -115,11 +125,25 @@ function digLake(terrain: Uint8Array, rng: Rng): void {
   }
   const radius = 4 + rng.int(3);
   const wobble = createNoise2D(rng.next);
+  const candidate = new Uint8Array(TILE_COUNT);
   for (let y = cy - radius - 2; y <= cy + radius + 2; y++) {
     for (let x = cx - radius - 2; x <= cx + radius + 2; x++) {
       if (x < 1 || y < 1 || x >= MAP_SIZE - 1 || y >= MAP_SIZE - 1) continue;
       const d = Math.hypot(x - cx, y - cy);
-      if (d < radius * (1 + 0.3 * wobble(x / 4, y / 4))) terrain[idx(x, y)] = Terrain.Water;
+      if (d < radius * (1 + 0.3 * wobble(x / 4, y / 4))) candidate[idx(x, y)] = 1;
+    }
+  }
+  // Keep only the part connected to the centre, so the wobble cannot leave stray ponds.
+  const stack = [idx(cx, cy)];
+  candidate[idx(cx, cy)] = 2;
+  for (let tile = stack.pop(); tile !== undefined; tile = stack.pop()) {
+    terrain[tile] = Terrain.Water;
+    for (const [dx, dy] of DIRS4) {
+      const next = idx(xOf(tile) + dx, yOf(tile) + dy);
+      if (candidate[next] === 1) {
+        candidate[next] = 2;
+        stack.push(next);
+      }
     }
   }
 }
