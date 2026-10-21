@@ -45,7 +45,7 @@ const SERVICE_HEIGHT: Record<BuildingKind, number> = {
   clinic: 1.0,
   fireStation: 0.9,
   policeStation: 0.9,
-  tree: 0.6,
+  tree: 0.45,
   plaza: 0.06,
 };
 

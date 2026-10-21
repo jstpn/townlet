@@ -13,7 +13,7 @@ Spec: tasks/spec.md. Tick as you go. Review rounds after every 3 or 4 code commi
 - [x] 6. Coverage, pollution, demand, growth, occupancy, population, tests
 - [x] 7. Economy, tax, happiness, debt, win and lose, tests
 - [x] 8. HUD: start screen, top bar, build menu, info panel, budget, toasts, title cards, pause menu, hints
-- [ ] Review round B
+- [x] Review round B
 - [ ] 9. Procedural buildings for every type, level and service; windows; variants
 - [ ] 10. Fire: sim and effects, tests
 - [ ] 11. Cars on the road graph

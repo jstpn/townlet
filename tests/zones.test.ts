@@ -73,10 +73,10 @@ describe('placing buildings', () => {
     const sim = founded();
     sim.placeBuilding('school', 10, 10);
     const money = sim.state.money;
-    expect(sim.bulldozeRect(11, 11, 11, 11)).toEqual({ ok: true, cost: 2 });
+    expect(sim.bulldozeRect(11, 11, 11, 11)).toEqual({ ok: true, cost: 8 });
     expect(sim.state.buildingId[idx(10, 10)]).toBe(-1);
     expect(sim.state.buildings.size).toBe(1);
-    expect(sim.state.money).toBe(money - 2);
+    expect(sim.state.money).toBe(money - 8);
   });
 });
 
@@ -119,5 +119,25 @@ describe('zoning rules', () => {
     sim.placeRoadLine(2, 2, 2, 4);
     expect(sim.state.zone[idx(2, 3)]).toBe(Zone.None);
     expect(sim.state.rev.zones).toBeGreaterThan(before);
+  });
+});
+
+describe('roads and lots', () => {
+  it('refuses to pave over developed lots and names buildings, not water, when blocked', () => {
+    const sim = founded();
+    sim.zoneRect(Zone.Residential, 2, 2, 2, 2);
+    sim.state.level[idx(2, 2)] = 2;
+    expect(sim.planRoadLine(2, 2, 2, 2).error).toBe('occupied');
+    expect(sim.planRoadLine(30, 30, 30, 30).error).toBe('occupied');
+    expect(sim.state.level[idx(2, 2)]).toBe(2);
+  });
+
+  it('charges the whole footprint when a bulldoze rectangle clips a building', () => {
+    const sim = founded();
+    sim.placeBuilding('school', 10, 10);
+    const money = sim.state.money;
+    expect(sim.bulldozeRect(11, 11, 11, 11)).toEqual({ ok: true, cost: 8 });
+    expect(sim.state.buildings.size).toBe(1);
+    expect(sim.state.money).toBe(money - 8);
   });
 });

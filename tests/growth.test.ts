@@ -58,6 +58,8 @@ describe('growth', () => {
   it('empties lots when the town is unhappy', () => {
     const sim = town();
     sim.placeRoadLine(8, 12, 12, 12);
+    sim.placeBuilding('windTurbine', 8, 8);
+    sim.placeBuilding('waterTower', 12, 8);
     sim.zoneRect(Zone.Residential, 10, 10, 10, 10);
     sim.zoneRect(Zone.Industrial, 10, 11, 10, 11);
     const home = idx(10, 10);
@@ -89,5 +91,19 @@ describe('growth', () => {
     days(sim, 2);
     expect(sim.state.level[home]).toBe(0);
     expect(sim.state.zone[home]).toBe(Zone.Residential);
+  });
+});
+
+describe('losing services', () => {
+  it('empties lots that lose power or road access', () => {
+    const sim = town();
+    sim.zoneRect(Zone.Residential, 30, 34, 30, 34);
+    const lot = idx(30, 34);
+    sim.state.level[lot] = 1;
+    sim.state.occupancy[lot] = 1;
+    sim.state.rev.zones++;
+    sim.bulldozeRect(26, 33, 35, 33);
+    days(sim, 40);
+    expect(sim.state.occupancy[lot]).toBe(0);
   });
 });

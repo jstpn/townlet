@@ -214,22 +214,26 @@ export class Sim {
 
   /**
    * Road along a straight line from the first point toward the second, snapped to the axis that
-   * moved most. Existing road is free, water and buildings are skipped, forest is cleared for a fee.
+   * moved most. Existing road is free; water, buildings and developed lots are skipped; forest is
+   * cleared for a fee.
    */
   planRoadLine(x0: number, y0: number, x1: number, y1: number): Plan {
     const end = snapToAxis({ x: x0, y: y0 }, { x: x1, y: y1 });
     const tiles = lineTiles(x0, y0, end.x, end.y);
     let cost = 0;
+    let water = false;
     const planned = tiles.map((tile): PlanTile => {
-      const status: PlanStatus = this.occupied(tile)
-        ? this.state.road[tile] === 1
+      water ||= this.state.terrain[tile] === Terrain.Water;
+      const status: PlanStatus =
+        this.state.road[tile] === 1
           ? 'keep'
-          : 'blocked'
-        : 'change';
+          : this.occupied(tile) || this.state.level[tile] > 0
+            ? 'blocked'
+            : 'change';
       if (status === 'change') cost += this.price(ROAD_COST) + this.clearingFee(tile);
       return { x: xOf(tile), y: yOf(tile), status };
     });
-    return this.checked(planned, cost, 'water');
+    return this.checked(planned, cost, water ? 'water' : 'occupied');
   }
 
   placeRoadLine(x0: number, y0: number, x1: number, y1: number): CommandResult {
@@ -301,22 +305,30 @@ export class Sim {
     return result;
   }
 
-  /** Clears road, zone, buildings and forest from a rectangle, for a flat fee per cleared tile. */
+  /**
+   * Clears road, zone, buildings and forest from a rectangle, for a flat fee per cleared tile.
+   * A building clipped by the rectangle goes entirely, and its whole footprint is in the plan.
+   */
   planBulldozeRect(x0: number, y0: number, x1: number, y1: number): Plan {
     const s = this.state;
-    const planned = rectTiles(x0, y0, x1, y1).map((tile): PlanTile => {
+    const planned = new Map<number, PlanTile>();
+    const plan = (tile: number, status: PlanStatus): void => {
+      if (planned.get(tile)?.status !== 'change') {
+        planned.set(tile, { x: xOf(tile), y: yOf(tile), status });
+      }
+    };
+    for (const tile of rectTiles(x0, y0, x1, y1)) {
       const building = s.buildingId[tile] === -1 ? undefined : s.buildings.get(s.buildingId[tile]);
-      const status: PlanStatus =
-        building?.kind === 'townHall'
-          ? 'blocked'
-          : s.road[tile] === 1 ||
-              s.zone[tile] !== Zone.None ||
-              building !== undefined ||
-              s.terrain[tile] === Terrain.Forest
-            ? 'change'
-            : 'keep';
-      return { x: xOf(tile), y: yOf(tile), status };
-    });
+      if (building?.kind === 'townHall') plan(tile, 'blocked');
+      else if (building) for (const t of footprint(building)) plan(t, 'change');
+      else if (s.road[tile] === 1 || s.zone[tile] !== Zone.None || s.terrain[tile] === Terrain.Forest)
+        plan(tile, 'change');
+      else plan(tile, 'keep');
+    }
+    return this.bulldozePlan([...planned.values()]);
+  }
+
+  private bulldozePlan(planned: PlanTile[]): Plan {
     const count = planned.filter((t) => t.status === 'change').length;
     if (planned.length === 0) return { tiles: planned, cost: 0, error: 'out-of-bounds' };
     if (count === 0) {

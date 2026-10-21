@@ -126,7 +126,7 @@ export function stepGrowth(
     const want = level > 0 || mayGrow ? desirability(state, fields, tile) : 0;
 
     if (level > 0) {
-      const filling = demand > -0.2 && content;
+      const filling = served && reachable && demand > -0.2 && content;
       const occupancy = state.occupancy[tile];
       state.occupancy[tile] = filling
         ? Math.min(1, occupancy + 0.05)
