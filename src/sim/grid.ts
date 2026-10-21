@@ -142,6 +142,8 @@ export function distanceField(isSource: (tile: number) => boolean): Uint16Array 
 export const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 /** Modulo that stays in [0, n) for negative values too. */
 export const mod = (a: number, n: number): number => ((a % n) + n) % n;
+/** An angle folded into [-pi, pi). */
+export const wrapAngle = (a: number): number => mod(a + Math.PI, 2 * Math.PI) - Math.PI;
 
 const cameFrom = new Int32Array(TILE_COUNT);
 

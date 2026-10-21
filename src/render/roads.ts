@@ -5,7 +5,15 @@ import { GeometryBuilder } from './geometryBuilder';
 import { STEP_Y, groundY } from './ground';
 import type { Layer } from './layer';
 import type { Palette } from './palette';
-import { ROAD_E, ROAD_N, ROAD_S, ROAD_W, rampDirection, roadConnections } from './roadMask';
+import {
+  ROAD_E,
+  ROAD_N,
+  ROAD_S,
+  ROAD_W,
+  rampDirection,
+  rampRise,
+  roadConnections,
+} from './roadMask';
 
 const KERB_H = 0.035;
 const ROAD_H = 0.055;
@@ -55,12 +63,8 @@ function buildRoadGeometry(
       const up = rampDirection(road, height, x, y);
       if (up !== 0) {
         // A straight slope up to the next terrace, full width, with the surface inset on the sides only.
-        const rise = (px: number, pz: number): number => {
-          const fx = px - x;
-          const fz = pz - y;
-          const t = up === ROAD_N ? 1 - fz : up === ROAD_S ? fz : up === ROAD_E ? fx : 1 - fx;
-          return base + t * STEP_Y;
-        };
+        const rise = (px: number, pz: number): number =>
+          base + rampRise(up, px - x, pz - y) * STEP_Y;
         slab(builder, x, y, x + 1, y + 1, rise, KERB_H, kerb);
         if (up === ROAD_N || up === ROAD_S) slab(builder, x0, y, x1, y + 1, rise, ROAD_H, surface);
         else slab(builder, x, y0, x + 1, y1, rise, ROAD_H, surface);

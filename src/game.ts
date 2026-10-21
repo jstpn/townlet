@@ -20,7 +20,7 @@ import { TerrainLayer } from './render/terrain';
 import { WaterLayer } from './render/water';
 import { ZoneLayer } from './render/zones';
 import type { Difficulty } from './sim/difficulty';
-import { type SaveFile, clearSave, writeSave } from './save';
+import { SAVE_VERSION, type SaveFile, clearSave, writeSave } from './save';
 import { MAP_SIZE, TILE_COUNT, type Point, idx, xOf, yOf } from './sim/grid';
 import { restoreSim, snapshot } from './sim/save';
 import { Sim } from './sim/sim';
@@ -77,7 +77,6 @@ export class Game {
         : new Sim({ seed: start.seed, difficulty: start.difficulty });
     this.gfx = new GameRenderer(canvas, this.palette);
     if ('sim' in start) this.gfx.rig.setPose(start.camera);
-    this.gfx.rig.ground = this.cursor.ground = this.ring.ground = this.sim.state.height;
     for (const layer of this.layers) this.gfx.scene.add(layer.object);
     this.gfx.scene.add(this.cursor.object, this.ring.object);
     this.pointer = new Pointer(canvas);
@@ -97,7 +96,7 @@ export class Game {
 
   /** Soft highlight under the info panel's selection, or a building's reach. */
   highlight(tiles: readonly Point[] | undefined): void {
-    if (tiles) this.ring.show(tiles, 'ring');
+    if (tiles) this.ring.show(tiles, 'ring', this.sim.state.height);
     else this.ring.clear();
   }
 
@@ -116,7 +115,7 @@ export class Game {
     if (this.sim.state.status === 'lost') clearSave();
     else
       writeSave({
-        version: 1,
+        version: SAVE_VERSION,
         sim: snapshot(this.sim),
         palette: this.palette.name,
         camera: this.gfx.rig.pose(),
@@ -232,7 +231,7 @@ export class Game {
     if (this.tool.previewRev !== this.previewRev) {
       this.previewRev = this.tool.previewRev;
       const preview = this.tool.preview;
-      if (preview) this.cursor.show(preview.plan.tiles, preview.tint);
+      if (preview) this.cursor.show(preview.plan.tiles, preview.tint, this.sim.state.height);
       else this.cursor.clear();
     }
   }

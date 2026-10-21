@@ -1,4 +1,5 @@
 import type { CameraRig } from '../render/camera';
+import { wrapAngle } from '../sim/grid';
 import type { Pointer } from './pointer';
 
 const PAN_SPEED = 1.1; // screen heights per second
@@ -77,31 +78,29 @@ export class CameraControls {
     const dy = this.pointer.y - this.drag.lastY;
     this.drag.lastX = this.pointer.x;
     this.drag.lastY = this.pointer.y;
-    if (this.drag.button === 2) {
-      this.rig.dragYaw += dx * 0.006;
-    } else {
-      const h = this.element.clientHeight;
-      this.rig.pan((-dx / h) * 2, (dy / h) * 2);
-    }
+    if (this.drag.button === 2) this.rig.dragYaw += dx * 0.006;
+    else this.panBy(dx, dy);
   };
 
-  /** Two fingers: their midpoint pans, their distance zooms and their angle rotates. */
+  /** Pans so the ground keeps pace with a pointer moved by dx, dy pixels. */
+  private panBy(dx: number, dy: number): void {
+    const h = this.element.clientHeight;
+    this.rig.pan((-dx / h) * 2, (dy / h) * 2);
+  }
+
+  /** Two fingers: their midpoint (where the pointer sits) pans, their distance zooms and their angle rotates. */
   private onPinch(): void {
     const [a, b] = [...this.pointer.touches.values()];
     const next: Pinch = {
       distance: Math.hypot(b.x - a.x, b.y - a.y) || 1,
       angle: Math.atan2(b.y - a.y, b.x - a.x),
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2,
+      x: this.pointer.x,
+      y: this.pointer.y,
     };
     if (this.pinch) {
-      const h = this.element.clientHeight;
       this.rig.zoomBy(this.pinch.distance / next.distance, this.pointer.ndc);
-      this.rig.pan((-(next.x - this.pinch.x) / h) * 2, ((next.y - this.pinch.y) / h) * 2);
-      let twist = next.angle - this.pinch.angle;
-      if (twist > Math.PI) twist -= 2 * Math.PI;
-      if (twist < -Math.PI) twist += 2 * Math.PI;
-      this.rig.dragYaw += twist;
+      this.panBy(next.x - this.pinch.x, next.y - this.pinch.y);
+      this.rig.dragYaw += wrapAngle(next.angle - this.pinch.angle);
     }
     this.pinch = next;
   }

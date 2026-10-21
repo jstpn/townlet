@@ -6,7 +6,15 @@ import { SNAPSHOT_GRIDS, type SimSnapshot } from './sim/save';
 
 export const SAVE_KEY = 'townlet:autosave';
 
-export type SaveFile = { version: 1; sim: SimSnapshot; palette: PaletteName; camera: CameraPose };
+/** Bumped when a save's shape changes; older saves are ignored rather than migrated. */
+export const SAVE_VERSION = 2;
+
+export type SaveFile = {
+  version: typeof SAVE_VERSION;
+  sim: SimSnapshot;
+  palette: PaletteName;
+  camera: CameraPose;
+};
 
 export function writeSave(file: SaveFile): void {
   try {
@@ -19,7 +27,7 @@ export function writeSave(file: SaveFile): void {
 /** A shape check, so a truncated or edited save is ignored rather than crashing the restore. */
 function isSaveFile(file: Partial<SaveFile>): file is SaveFile {
   const sim = file.sim;
-  if (file.version !== 1 || !sim || !isPaletteName(file.palette ?? '')) return false;
+  if (file.version !== SAVE_VERSION || !sim || !isPaletteName(file.palette ?? '')) return false;
   if (!isDifficulty(sim.difficulty) || typeof sim.seed !== 'string') return false;
   if (!Array.isArray(sim.buildings) || !Array.isArray(sim.announced)) return false;
   return SNAPSHOT_GRIDS.every((key) => Array.isArray(sim[key]) && sim[key].length === TILE_COUNT);

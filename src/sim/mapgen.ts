@@ -176,6 +176,9 @@ function plantForest(terrain: Uint8Array, noise: Noise2D): void {
   }
 }
 
+/** The highest terrace a map is given. */
+export const TOP_LEVEL = 2;
+
 /**
  * Broad terraces from a third noise layer, on grass and forest only: the beach stays low. Lone
  * bumps and dips are levelled, then every step down is limited to one level so roads can ramp.
@@ -188,7 +191,7 @@ function raiseHills(terrain: Uint8Array, noise: Noise2D): Uint8Array {
       const tile = idx(x, y);
       if (terrain[tile] !== Terrain.Grass && terrain[tile] !== Terrain.Forest) continue;
       const n = fbm(noise, x * scale, y * scale);
-      height[tile] = n > 0.38 ? 2 : n > 0.12 ? 1 : 0;
+      height[tile] = n > 0.38 ? TOP_LEVEL : n > 0.12 ? 1 : 0;
     }
   }
   const around = (tile: number, pick: (a: number, b: number) => number): number => {

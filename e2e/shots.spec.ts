@@ -1,6 +1,6 @@
 import { test } from '@playwright/test';
 import { CYCLE_DAYS, MIDNIGHT } from '../src/render/daylight';
-import { SAVE_KEY, type SaveFile } from '../src/save';
+import { SAVE_KEY, SAVE_VERSION, type SaveFile } from '../src/save';
 import { snapshot } from '../src/sim/save';
 import { autoplay } from '../tests/autoplayer';
 import { enter } from './boot';
@@ -11,7 +11,7 @@ test('takes the README screenshots @shots', async ({ page }) => {
   // A whole number of light cycles in, so the first shots are in full day.
   sim.state.day = CYCLE_DAYS * 6;
   const save: SaveFile = {
-    version: 1,
+    version: SAVE_VERSION,
     sim: snapshot(sim),
     palette: 'budapest',
     camera: { x: hall.x + 1, z: hall.y + 3, zoom: 17, rotation: 0 },

@@ -64,6 +64,7 @@ export function computeHappiness(state: SimState, fields: Fields): number {
   const share = (part: number): number => (100 * part) / residents;
   const workers = state.population * 0.6;
   const employment = workers === 0 ? 100 : 100 * Math.min(1, state.jobs / workers);
-  const comfort = residents === 0 ? 500 : 2 * share(covered) + share(parked) + 2 * (100 - share(smoked));
+  const comfort =
+    residents === 0 ? 500 : 2 * share(covered) + share(parked) + 2 * (100 - share(smoked));
   return (2 * taxScore(state.taxRate) + comfort + 2 * employment) / 9;
 }

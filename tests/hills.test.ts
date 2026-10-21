@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ROAD_E, ROAD_N, rampDirection, roadY } from '../src/render/roadMask';
 import { STEP_Y } from '../src/render/ground';
 import { DIRS4, MAP_SIZE, TILE_COUNT, idx, inBounds } from '../src/sim/grid';
-import { generateMap } from '../src/sim/mapgen';
+import { TOP_LEVEL, generateMap } from '../src/sim/mapgen';
 import { Terrain } from '../src/sim/types';
 import { foundedSim } from './helpers';
 
@@ -14,34 +14,35 @@ describe('generateMap hills', () => {
     ...Array.from({ length: 12 }, (_, i) => `h-${i}`),
   ];
 
-  it('raises terraces of at most two levels on grass and forest, never on water or sand', () => {
-    for (const seed of seeds) {
-      const { terrain, height } = generateMap(seed);
+  const maps = seeds.map((seed) => generateMap(seed));
+
+  it('raises terraces up to the top level on grass and forest, never on water or sand', () => {
+    for (const { terrain, height } of maps) {
       expect(height.length).toBe(TILE_COUNT);
       let raised = 0;
+      let wrong = 0;
       for (let tile = 0; tile < TILE_COUNT; tile++) {
-        expect(height[tile]).toBeLessThanOrEqual(2);
-        if (terrain[tile] === Terrain.Water || terrain[tile] === Terrain.Sand)
-          expect(height[tile]).toBe(0);
+        const shore = terrain[tile] === Terrain.Water || terrain[tile] === Terrain.Sand;
+        if (height[tile] > TOP_LEVEL || (shore && height[tile] > 0)) wrong++;
         if (height[tile] > 0) raised++;
       }
+      expect(wrong).toBe(0);
       expect(raised).toBeGreaterThan(50);
     }
   });
 
   it('never steps more than one level between neighbours', () => {
-    for (const seed of seeds) {
-      const { height } = generateMap(seed);
+    for (const { height } of maps) {
+      let steps = 0;
       for (let y = 0; y < MAP_SIZE; y++) {
         for (let x = 0; x < MAP_SIZE; x++) {
           for (const [dx, dy] of DIRS4) {
             if (!inBounds(x + dx, y + dy)) continue;
-            expect(Math.abs(height[idx(x, y)] - height[idx(x + dx, y + dy)])).toBeLessThanOrEqual(
-              1,
-            );
+            if (Math.abs(height[idx(x, y)] - height[idx(x + dx, y + dy)]) > 1) steps++;
           }
         }
       }
+      expect(steps).toBe(0);
     }
   });
 
@@ -56,8 +57,7 @@ describe('generateMap hills', () => {
 describe('services on hills', () => {
   it('need level ground for every tile of their footprint', () => {
     const sim = foundedSim();
-    sim.state.height.fill(1, idx(10, 10), idx(10, 10) + 1);
-    expect(sim.placeBuilding('school', 9, 9).ok).toBe(false);
+    sim.state.height[idx(10, 10)] = 1;
     expect(sim.placeBuilding('school', 9, 9)).toEqual({ ok: false, reason: 'uneven' });
     expect(sim.placeBuilding('school', 11, 11).ok).toBe(true);
     expect(sim.placeBuilding('tree', 10, 10).ok).toBe(true);

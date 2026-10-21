@@ -31,8 +31,6 @@ export type SimOptions = {
   difficulty: Difficulty;
   /** Override the generated map, for tests. */
   terrain?: Uint8Array;
-  /** Terrace levels to go with `terrain`; flat when left out. */
-  height?: Uint8Array;
   /** Override the starting money, for tests. */
   money?: number;
   /** Resume the random sequence from a save. */
@@ -150,8 +148,8 @@ export class Sim {
       difficulty: options.difficulty,
       day: 0,
       money: options.money ?? settings.startingMoney,
-      terrain: options.terrain ?? map.terrain,
-      height: options.height ?? map.height,
+      terrain: map.terrain,
+      height: map.height,
       road: new Uint8Array(TILE_COUNT),
       zone: new Uint8Array(TILE_COUNT),
       level: new Uint8Array(TILE_COUNT),

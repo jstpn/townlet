@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MAP_SIZE } from '../sim/grid';
+import { MAP_SIZE, wrapAngle } from '../sim/grid';
 import type { SimState } from '../sim/sim';
 import { GeometryBuilder } from './geometryBuilder';
 import { uploadInstances } from './instanced';
@@ -72,7 +72,7 @@ export class BirdLayer implements Layer {
     const half = MAP_SIZE / 2;
     if (Math.abs(flock.x - half) > half - EDGE || Math.abs(flock.z - half) > half - EDGE) {
       const home = Math.atan2(half - flock.z, half - flock.x);
-      const delta = Math.atan2(Math.sin(home - flock.heading), Math.cos(home - flock.heading));
+      const delta = wrapAngle(home - flock.heading);
       turn += Math.sign(delta) * 1.2;
     }
     flock.heading += turn * dt;

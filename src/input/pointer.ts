@@ -106,7 +106,7 @@ export class Pointer {
 
   /** With two fingers down the pointer sits between them, so zoom anchors on the pinch. */
   private track(e: PointerEvent): void {
-    if (this.multi && this.touches.size >= 2) {
+    if (this.touches.size >= 2) {
       let x = 0;
       let y = 0;
       for (const t of this.touches.values()) {

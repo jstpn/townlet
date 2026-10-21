@@ -5,6 +5,7 @@ import type { SimState } from '../sim/sim';
 import { Zone } from '../sim/types';
 import { GeometryBuilder } from './geometryBuilder';
 import { uploadInstances } from './instanced';
+import { pick } from './random';
 import type { Layer } from './layer';
 import type { Palette } from './palette';
 import { roadY } from './roadMask';
@@ -152,8 +153,6 @@ export class CarLayer implements Layer {
     this.object.setColorAt(index, this.colors[car.color]);
   }
 }
-
-const pick = <T>(list: T[]): T => list[Math.floor(Math.random() * list.length)];
 
 /** A body and a cabin, facing +x. The instance colour paints the whole car. */
 function carGeometry(): THREE.BufferGeometry {

@@ -27,7 +27,7 @@ export class BuildTool {
   /** Tile clicked with no tool active, for the info panel. A new object per click. */
   selected: Point | undefined;
   /** Called with the outcome of every committed gesture and the tool that made it. */
-  onCommand: ((result: CommandResult, tool: Tool) => void) | undefined;
+  onCommand: ((result: CommandResult, tool: Exclude<Tool, { kind: 'none' }>) => void) | undefined;
   private start: Point | undefined;
   private hover: Point | undefined;
 
@@ -58,7 +58,9 @@ export class BuildTool {
 
   /** Re-picks the tile under the pointer. Called on pointer moves and once per frame, since the camera can move too. */
   readonly update = (): void => {
-    const tile = this.pointer.inside ? this.rig.pickTile(this.pointer.ndc) : undefined;
+    const tile = this.pointer.inside
+      ? this.rig.pickTile(this.pointer.ndc, this.sim.state.height)
+      : undefined;
     if (tile?.x === this.hover?.x && tile?.y === this.hover?.y) return;
     this.hover = tile;
     this.refreshPreview();
@@ -111,7 +113,7 @@ export class BuildTool {
 
   private readonly onPointerDown = (button: number): void => {
     if (button !== 0) return;
-    this.hover = this.rig.pickTile(this.pointer.ndc);
+    this.hover = this.rig.pickTile(this.pointer.ndc, this.sim.state.height);
     if (this.tool.kind === 'none') {
       this.select(this.hover);
       return;

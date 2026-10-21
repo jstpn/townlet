@@ -89,7 +89,8 @@ describe('ending the game', () => {
 
   it('wins at the resident target and keeps going', () => {
     const sim = town('easy');
-    for (let i = 0; i < 70; i++) fullLot(sim, 2 + (i % 20), 40 + Math.floor(i / 20), Zone.Residential, 3);
+    for (let i = 0; i < 70; i++)
+      fullLot(sim, 2 + (i % 20), 40 + Math.floor(i / 20), Zone.Residential, 3);
     sim.step();
     expect(sim.state.status).toBe('won');
     expect(sim.takeEvents()).toContainEqual({ kind: 'won' });
@@ -101,7 +102,11 @@ describe('ending the game', () => {
 
 describe('before founding', () => {
   it('does not advance the calendar', () => {
-    const sim = new Sim({ seed: 'test', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
+    const sim = new Sim({
+      seed: 'test',
+      difficulty: 'normal',
+      terrain: flatTerrain(Terrain.Grass),
+    });
     sim.step();
     expect(sim.state.day).toBe(0);
   });

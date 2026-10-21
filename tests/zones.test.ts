@@ -20,8 +20,15 @@ describe('zoning', () => {
 
 describe('founding the town', () => {
   it('requires the town hall before anything else', () => {
-    const sim = new Sim({ seed: 'test', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
-    expect(sim.zoneRect(Zone.Residential, 2, 2, 4, 3)).toEqual({ ok: false, reason: 'needs-town-hall' });
+    const sim = new Sim({
+      seed: 'test',
+      difficulty: 'normal',
+      terrain: flatTerrain(Terrain.Grass),
+    });
+    expect(sim.zoneRect(Zone.Residential, 2, 2, 4, 3)).toEqual({
+      ok: false,
+      reason: 'needs-town-hall',
+    });
     expect(sim.placeRoadLine(0, 0, 0, 2)).toEqual({ ok: false, reason: 'needs-town-hall' });
     expect(sim.placeBuilding('park', 5, 5)).toEqual({ ok: false, reason: 'needs-town-hall' });
     expect(sim.placeBuilding('townHall', 30, 30)).toEqual({ ok: true, cost: 0 });

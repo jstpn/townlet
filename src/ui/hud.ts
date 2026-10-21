@@ -152,7 +152,7 @@ export class Hud {
     this.overlay.hidden = true;
     game.tool.onCommand = (result, tool) => {
       if (result.ok) {
-        if (tool.kind !== 'none') game.sound.play(tool.kind);
+        game.sound.play(tool.kind);
       } else {
         this.toast(ERROR_TEXT[result.reason]);
         game.sound.play('error');

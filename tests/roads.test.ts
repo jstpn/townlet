@@ -17,7 +17,8 @@ describe('roads', () => {
 
   it('refuses water and reports why', () => {
     const terrain = flatTerrain(Terrain.Water);
-    for (const t of [idx(30, 30), idx(31, 30), idx(30, 31), idx(31, 31)]) terrain[t] = Terrain.Grass;
+    for (const t of [idx(30, 30), idx(31, 30), idx(30, 31), idx(31, 31)])
+      terrain[t] = Terrain.Grass;
     const sim = newSim(terrain);
     expect(sim.placeRoadLine(10, 10, 10, 10)).toEqual({ ok: false, reason: 'water' });
     expect(sim.state.road[idx(10, 10)]).toBe(0);
@@ -110,7 +111,8 @@ describe('revision counters', () => {
 
   it('stay put when a command is refused', () => {
     const terrain = flatTerrain(Terrain.Water);
-    for (const t of [idx(30, 30), idx(31, 30), idx(30, 31), idx(31, 31)]) terrain[t] = Terrain.Grass;
+    for (const t of [idx(30, 30), idx(31, 30), idx(30, 31), idx(31, 31)])
+      terrain[t] = Terrain.Grass;
     const sim = newSim(terrain);
     const before = { ...sim.state.rev };
     sim.placeRoadLine(2, 5, 6, 5);

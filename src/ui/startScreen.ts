@@ -70,7 +70,8 @@ export function showStartScreen(
       screen.remove();
       resolve(result);
     };
-    const found = (): void => done({ seed: seed.value.trim() || randomSeed(), difficulty, palette });
+    const found = (): void =>
+      done({ seed: seed.value.trim() || randomSeed(), difficulty, palette });
 
     const screen = el(
       'div.start',

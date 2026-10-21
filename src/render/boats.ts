@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { MAP_SIZE, distanceField, idx, inBounds, xOf } from '../sim/grid';
+import { MAP_SIZE, TILE_COUNT, idx, inBounds, xOf, yOf } from '../sim/grid';
 import type { SimState } from '../sim/sim';
-import { Terrain } from '../sim/types';
 import { GeometryBuilder } from './geometryBuilder';
 import { uploadInstances } from './instanced';
 import type { Layer } from './layer';
 import type { Palette } from './palette';
-import { WATER_Y } from './terrain';
+import { pick } from './random';
+import { WATER_Y, waterDepth } from './terrain';
 
 const MAX_BOATS = 6;
 const RESIDENTS_PER_BOAT = 600;
@@ -28,7 +28,8 @@ export class BoatLayer implements Layer {
   private readonly hulls: THREE.InstancedMesh;
   private readonly sails: THREE.InstancedMesh;
   private boats: Boat[] = [];
-  private depth: Uint16Array | undefined;
+  private depth: Uint16Array = new Uint16Array(0);
+  private openTiles: number[] = [];
   private target = 0;
   private time = 0;
   private hullColors: THREE.Color[] = [];
@@ -66,8 +67,12 @@ export class BoatLayer implements Layer {
       );
       this.sailColors = palette.walls.map((c) => new THREE.Color(c));
     }
-    // Water never changes after generation, so the depth field is computed once per town.
-    this.depth ??= distanceField((tile) => state.terrain[tile] !== Terrain.Water);
+    if (this.depth.length === 0) {
+      this.depth = waterDepth(state.terrain);
+      for (let tile = 0; tile < TILE_COUNT; tile++) {
+        if (this.depth[tile] >= OPEN_DEPTH) this.openTiles.push(tile);
+      }
+    }
     this.target = Math.min(MAX_BOATS, 2 + Math.floor(state.population / RESIDENTS_PER_BOAT));
     return false;
   }
@@ -90,7 +95,7 @@ export class BoatLayer implements Layer {
   private open(x: number, z: number): boolean {
     const tx = Math.floor(x);
     const tz = Math.floor(z);
-    if (inBounds(tx, tz)) return (this.depth?.[idx(tx, tz)] ?? 0) >= OPEN_DEPTH;
+    if (inBounds(tx, tz)) return this.depth[idx(tx, tz)] >= OPEN_DEPTH;
     return tx >= -MARGIN && tz >= -MARGIN && tx < MAP_SIZE + MARGIN && tz < MAP_SIZE + MARGIN;
   }
 
@@ -105,19 +110,10 @@ export class BoatLayer implements Layer {
   }
 
   private spawn(): void {
-    if (!this.depth || this.hullColors.length === 0) return;
-    const open: number[] = [];
-    this.depth.forEach((d, tile) => {
-      if (d >= OPEN_DEPTH) open.push(tile);
-    });
-    if (open.length === 0) {
-      this.target = 0;
-      return;
-    }
-    const tile = open[Math.floor(Math.random() * open.length)];
+    const tile = pick(this.openTiles);
     this.boats.push({
       x: xOf(tile) + 0.5,
-      z: Math.floor(tile / MAP_SIZE) + 0.5,
+      z: yOf(tile) + 0.5,
       heading: Math.random() * Math.PI * 2,
       turn: Math.random() < 0.5 ? 1 : -1,
       phase: Math.random() * Math.PI * 2,

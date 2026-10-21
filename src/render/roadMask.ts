@@ -1,5 +1,5 @@
 import { idx, inBounds } from '../sim/grid';
-import { STEP_Y } from './ground';
+import { STEP_Y, groundY } from './ground';
 
 export const ROAD_N = 1;
 export const ROAD_E = 2;
@@ -39,16 +39,17 @@ export function rampDirection(road: Uint8Array, height: Uint8Array, x: number, y
   return (mask & ~(up | opposite)) === 0 ? up : 0;
 }
 
+/** How far up a ramp a tile-relative point sits: 0 at the low edge, 1 at the high edge. */
+export function rampRise(up: number, fx: number, fz: number): number {
+  return up === ROAD_N ? 1 - fz : up === ROAD_S ? fz : up === ROAD_E ? fx : 1 - fx;
+}
+
 /** Height of the road surface under a world point, following ramps; the terrace height elsewhere. */
 export function roadY(road: Uint8Array, height: Uint8Array, px: number, pz: number): number {
   const x = Math.floor(px);
   const z = Math.floor(pz);
   if (!inBounds(x, z)) return 0;
-  const base = height[idx(x, z)] * STEP_Y;
+  const base = groundY(height, idx(x, z));
   const up = rampDirection(road, height, x, z);
-  if (up === 0) return base;
-  const fx = px - x;
-  const fz = pz - z;
-  const t = up === ROAD_N ? 1 - fz : up === ROAD_S ? fz : up === ROAD_E ? fx : 1 - fx;
-  return base + t * STEP_Y;
+  return up === 0 ? base : base + rampRise(up, px - x, pz - z) * STEP_Y;
 }

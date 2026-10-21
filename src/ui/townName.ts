@@ -15,7 +15,18 @@ const ROOT = [
   'Lebowitz',
   'Darjeeling',
 ];
-const LAST = ['ford', 'ton', 'bury', 'wick', 'mouth', ' Bay', ' Hollow', ' Green', 'haven', ' Cross'];
+const LAST = [
+  'ford',
+  'ton',
+  'bury',
+  'wick',
+  'mouth',
+  ' Bay',
+  ' Hollow',
+  ' Green',
+  'haven',
+  ' Cross',
+];
 
 /** A town name that the seed always maps to, so the postcard matches the town. */
 export function townName(seed: string): string {

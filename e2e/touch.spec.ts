@@ -16,10 +16,7 @@ test('two fingers pinch, drag and twist the camera; one finger lays road', async
     points: TouchPoint[],
   ): Promise<unknown> => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
 
-  const before = await page.evaluate(() => {
-    const rig = window.townlet.gfx.rig;
-    return { zoom: rig.zoom, x: rig.target.x, z: rig.target.z, rotation: rig.rotationIndex };
-  });
+  const before = await page.evaluate(() => window.townlet.gfx.rig.pose());
   // Spread apart while sliding and turning a quarter.
   await touch('touchStart', [
     { x: 160, y: 420, id: 1 },
@@ -37,10 +34,7 @@ test('two fingers pinch, drag and twist the camera; one finger lays road', async
   }
   await touch('touchEnd', []);
   await page.waitForTimeout(600);
-  const after = await page.evaluate(() => {
-    const rig = window.townlet.gfx.rig;
-    return { zoom: rig.zoom, x: rig.target.x, z: rig.target.z, rotation: rig.rotationIndex };
-  });
+  const after = await page.evaluate(() => window.townlet.gfx.rig.pose());
   expect(after.zoom).toBeLessThan(before.zoom * 0.7);
   expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeGreaterThan(0.5);
   expect(after.rotation).not.toBe(before.rotation);
