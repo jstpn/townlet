@@ -1,5 +1,6 @@
+import type { Resource, Stock } from './ages';
 import { rectTiles } from './grid';
-import { Zone, type ZoneKind } from './types';
+import { Terrain, Zone, type ZoneKind } from './types';
 
 /** Prices at normal difficulty, before the cost multiplier. */
 export const ROAD_COST = 10;
@@ -30,6 +31,11 @@ export const BUILDING_KINDS = [
   'policeStation',
   'tree',
   'plaza',
+  'camp',
+  'tent',
+  'gatheringHut',
+  'woodcutter',
+  'dryingRack',
 ] as const;
 export type BuildingKind = (typeof BUILDING_KINDS)[number];
 
@@ -42,7 +48,29 @@ export type BuildingDef = {
   radius: number;
   services: readonly Service[];
   jobs: number;
+  /** Resource price, scaled by the cost multiplier like `cost`. */
+  materials?: Stock;
+  beds?: number;
+  /** Worker slots, filled by residents each day. */
+  slots?: number;
+  /** What each filled slot makes a day, and the terrain it needs within a radius. */
+  makes?: { resource: Resource; each: number; near?: { terrain: Terrain; radius: number } };
+  /** Added to the stock caps while standing. */
+  caps?: Stock;
 };
+
+/** A building of the engine ages: no coin price, upkeep, coverage or v1 jobs. */
+const engine = (label: string, size: 1 | 2, rest: Partial<BuildingDef>): BuildingDef => ({
+  label,
+  size,
+  cost: 0,
+  upkeep: 0,
+  radius: 0,
+  services: [],
+  jobs: 0,
+  ...rest,
+});
+const forest = (radius: number) => ({ terrain: Terrain.Forest, radius });
 
 export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   townHall: {
@@ -111,6 +139,19 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   },
   tree: { label: 'Tree', size: 1, cost: 5, upkeep: 0, radius: 0, services: [], jobs: 0 },
   plaza: { label: 'Plaza', size: 1, cost: 60, upkeep: 2, radius: 2, services: ['plaza'], jobs: 0 },
+  camp: engine('Camp', 2, { beds: 6, slots: 2 }),
+  tent: engine('Tent', 1, { materials: { wood: 4 }, beds: 3 }),
+  gatheringHut: engine('Gathering hut', 1, {
+    materials: { wood: 6 },
+    slots: 2,
+    makes: { resource: 'food', each: 2, near: forest(3) },
+  }),
+  woodcutter: engine('Woodcutter', 1, {
+    materials: { stone: 4 },
+    slots: 2,
+    makes: { resource: 'wood', each: 2, near: forest(3) },
+  }),
+  dryingRack: engine('Drying rack', 1, { materials: { wood: 6, stone: 4 }, caps: { food: 60 } }),
 };
 
 /** Residents (residential) or jobs (commercial, industrial) held by a full lot at levels 1 to 3. */

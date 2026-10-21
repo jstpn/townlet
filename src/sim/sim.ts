@@ -1,3 +1,4 @@
+import { AGE_DEFS, type Age, RESOURCES, type Stock, computeCaps, scaleStock } from './ages';
 import {
   BUILDINGS,
   BULLDOZE_COST,
@@ -29,6 +30,8 @@ import { Terrain, Zone, type ZoneKind } from './types';
 export type SimOptions = {
   seed: string;
   difficulty: Difficulty;
+  /** The age the town starts in. The Motor city, the v1 game, until the start screen offers ages. */
+  age?: Age;
   /** Override the generated map, for tests. */
   terrain?: Uint8Array;
   /** Override the starting money, for tests. */
@@ -46,7 +49,9 @@ export type CommandError =
   | 'needs-town-hall'
   | 'uneven'
   | 'already-built'
-  | 'protected';
+  | 'protected'
+  | 'wrong-age'
+  | 'short';
 
 export type CommandResult = { ok: true; cost: number } | { ok: false; reason: CommandError };
 
@@ -55,8 +60,8 @@ export type PlanStatus = 'change' | 'keep' | 'blocked';
 /** One tile of a planned command: `change` tiles will be altered, `keep` stays as is, `blocked` cannot. */
 export type PlanTile = { x: number; y: number; status: PlanStatus };
 
-/** What a command would do, priced, so the UI can preview it before committing. */
-export type Plan = { tiles: PlanTile[]; cost: number; error?: CommandError };
+/** What a command would do, priced in coin and materials, so the UI can preview it before committing. */
+export type Plan = { tiles: PlanTile[]; cost: number; materials?: Stock; error?: CommandError };
 
 export type Building = { id: number; kind: BuildingKind; x: number; y: number };
 
@@ -78,8 +83,11 @@ export const MAX_TAX_RATE = 20;
 export type SimState = {
   seed: string;
   difficulty: Difficulty;
+  age: Age;
   day: number;
+  /** The treasury, coin. */
   money: number;
+  stock: Stock;
   terrain: Uint8Array;
   /** Terrace level per tile, 0 to 2. Never changes after generation. */
   height: Uint8Array;
@@ -135,10 +143,12 @@ export class Sim {
     coverage: { rev: -1, value: undefined as Coverage | undefined },
     roadAccess: { rev: -1, value: undefined as Uint8Array | undefined },
     pollution: { rev: -1, value: undefined as Float32Array | undefined },
+    caps: { rev: -1, value: undefined as Stock | undefined },
   };
 
   constructor(options: SimOptions) {
     const settings = DIFFICULTY[options.difficulty];
+    const age = options.age ?? 'motor';
     this.rng = createRng(options.seed + ':sim', options.rngState);
     const map = options.terrain
       ? { terrain: options.terrain, height: new Uint8Array(TILE_COUNT) }
@@ -146,8 +156,10 @@ export class Sim {
     this.state = {
       seed: options.seed,
       difficulty: options.difficulty,
+      age,
       day: 0,
-      money: options.money ?? settings.startingMoney,
+      money: options.money ?? (AGE_DEFS[age].coin ? settings.startingMoney : 0),
+      stock: scaleStock(AGE_DEFS[age].caps, settings.startingStock),
       terrain: map.terrain,
       height: map.height,
       road: new Uint8Array(TILE_COUNT),
@@ -268,6 +280,11 @@ export class Sim {
     return this.cached(this.cache.pollution, this.state.rev.zones, computePollution);
   }
 
+  /** How much of each resource the town can hold. */
+  caps(): Stock {
+    return this.cached(this.cache.caps, this.state.rev.buildings, computeCaps);
+  }
+
   private cached<T>(
     slot: { rev: number; value: T | undefined },
     rev: number,
@@ -315,6 +332,7 @@ export class Sim {
 
   /** Paints a zone over a rectangle. Same zone is free; developed lots of another zone are blocked. */
   planZoneRect(zone: ZoneKind, x0: number, y0: number, x1: number, y1: number): Plan {
+    if (!AGE_DEFS[this.state.age].zones) return { tiles: [], cost: 0, error: 'wrong-age' };
     let cost = 0;
     const planned = rectTiles(x0, y0, x1, y1).map((tile): PlanTile => {
       const s = this.state;
@@ -337,11 +355,13 @@ export class Sim {
     });
   }
 
-  /** A service or decoration with its top-left footprint corner at (x, y). */
+  /** One of the age's buildings with its top-left footprint corner at (x, y). */
   planBuilding(kind: BuildingKind, x: number, y: number): Plan {
     const def = BUILDINGS[kind];
     const s = this.state;
-    if (kind === 'townHall' && s.founded) return { tiles: [], cost: 0, error: 'already-built' };
+    const age = AGE_DEFS[s.age];
+    if (!age.buildings.includes(kind)) return { tiles: [], cost: 0, error: 'wrong-age' };
+    if (kind === age.main && s.founded) return { tiles: [], cost: 0, error: 'already-built' };
     let cost = this.price(def.cost);
     const planned = footprint({ kind, x, y }).map((tile): PlanTile => {
       const blocked = this.occupied(tile) || s.level[tile] > 0;
@@ -354,24 +374,25 @@ export class Sim {
       return { tiles: planned, cost, error: 'occupied' };
     if (planned.some((t) => s.height[idx(t.x, t.y)] !== s.height[idx(x, y)]))
       return { tiles: planned, cost, error: 'uneven' };
-    if (kind !== 'townHall' && !s.founded)
-      return { tiles: planned, cost, error: 'needs-town-hall' };
-    return this.priced(planned, cost);
+    if (kind !== age.main && !s.founded) return { tiles: planned, cost, error: 'needs-town-hall' };
+    const materials = scaleStock(def.materials ?? {}, DIFFICULTY[s.difficulty].costMultiplier);
+    return this.priced(planned, cost, materials);
   }
 
   placeBuilding(kind: BuildingKind, x: number, y: number): CommandResult {
     const plan = this.planBuilding(kind, x, y);
     if (plan.error) return { ok: false, reason: plan.error };
     const id = this.state.nextBuildingId++;
+    const main = kind === AGE_DEFS[this.state.age].main;
     this.state.buildings.set(id, { id, kind, x, y });
-    if (kind === 'townHall') this.state.founded = true;
+    if (main) this.state.founded = true;
     const result = this.execute(plan, (tile) => {
       this.clearForest(tile);
       this.clearZone(tile);
       this.state.buildingId[tile] = id;
     });
     this.state.rev.buildings++;
-    if (kind === 'townHall') this.announce('founded', { kind: 'founded' });
+    if (main) this.announce('founded', { kind: 'founded' });
     else if (BUILDINGS[kind].services.length > 0) {
       this.announce(`service:${kind}`, { kind: 'service', building: kind });
     }
@@ -392,7 +413,7 @@ export class Sim {
     };
     for (const tile of rectTiles(x0, y0, x1, y1)) {
       const building = s.buildingId[tile] === -1 ? undefined : s.buildings.get(s.buildingId[tile]);
-      if (building?.kind === 'townHall') plan(tile, 'blocked');
+      if (building?.kind === AGE_DEFS[s.age].main) plan(tile, 'blocked');
       else if (building) for (const t of footprint(building)) plan(t, 'change');
       else if (
         s.road[tile] === 1 ||
@@ -428,8 +449,9 @@ export class Sim {
     });
   }
 
-  /** What a base price costs at this difficulty. */
+  /** What a base price in coin costs at this difficulty; nothing in an age before coin. */
   price(base: number): number {
+    if (!AGE_DEFS[this.state.age].coin) return 0;
     return Math.round(base * DIFFICULTY[this.state.difficulty].costMultiplier);
   }
 
@@ -437,10 +459,11 @@ export class Sim {
     return this.state.terrain[tile] === Terrain.Forest ? this.price(BULLDOZE_COST) : 0;
   }
 
-  private priced(tiles: PlanTile[], cost: number): Plan {
-    return cost > 0 && cost > this.state.money
-      ? { tiles, cost, error: 'insufficient-funds' }
-      : { tiles, cost };
+  private priced(tiles: PlanTile[], cost: number, materials?: Stock): Plan {
+    if (cost > 0 && cost > this.state.money) return { tiles, cost, error: 'insufficient-funds' };
+    if (!materials) return { tiles, cost };
+    const short = RESOURCES.some((r) => (materials[r] ?? 0) > (this.state.stock[r] ?? 0));
+    return short ? { tiles, cost, materials, error: 'short' } : { tiles, cost, materials };
   }
 
   /** Shared validation for tile-painting plans: needs a town hall, something to change, and funds. */
@@ -457,6 +480,10 @@ export class Sim {
   private execute(plan: Plan, apply: (tile: number) => void): CommandResult {
     if (plan.error) return { ok: false, reason: plan.error };
     this.state.money -= plan.cost;
+    for (const r of RESOURCES) {
+      const amount = plan.materials?.[r];
+      if (amount) this.state.stock[r] = (this.state.stock[r] ?? 0) - amount;
+    }
     for (const t of plan.tiles) {
       if (t.status === 'change' && inBounds(t.x, t.y)) apply(idx(t.x, t.y));
     }

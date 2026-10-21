@@ -37,13 +37,15 @@ Decisions, my calls within the spec, flagged for Joe:
 
 Steps, one commit each, failure modes written as red tests first:
 
-- [ ] 1. `feat: an age, its resources and the stock with caps` (`src/sim/ages.ts`,
+- [x] 1. `feat: an age, its resources and the stock with caps` (`src/sim/ages.ts`,
       `src/sim/catalogue.ts`, `src/sim/difficulty.ts`, `src/sim/sim.ts`, `tests/stock.test.ts`).
       Fails if: a new forager sim on normal holds anything but 15 food, 10 wood, 10 stone; caps
       are not 60, 40, 40; a drying rack does not raise food to 120; a motor sim holds stock or
       loses its v1 money; the camp is not the forager's first building; a townHall is accepted in
       the forager age or a tent in the motor city; a tent costs anything but 4 wood (5 on hard,
       rounded) or goes up with 3 wood; a forager path costs anything. Check: `npm run check`.
+      The snapshot gains the age and stock here, so `SAVE_VERSION` goes to 3 now and stays at 3
+      through step 5, since nothing between is released.
 - [ ] 2. `feat: residents arrive for beds and food, eat and leave` (`src/sim/people.ts`,
       `tests/people.test.ts`). Fails if: nobody arrives at a camp with food in stock; anyone
       arrives faster than `arrivalDays`, past the beds, or with food for under ten days;

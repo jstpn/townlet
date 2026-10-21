@@ -1,5 +1,6 @@
 import type { CameraPose } from './render/camera';
 import { type PaletteName, isPaletteName } from './render/palette';
+import { AGES } from './sim/ages';
 import { isDifficulty } from './sim/difficulty';
 import { TILE_COUNT } from './sim/grid';
 import { SNAPSHOT_GRIDS, type SimSnapshot } from './sim/save';
@@ -7,7 +8,7 @@ import { SNAPSHOT_GRIDS, type SimSnapshot } from './sim/save';
 export const SAVE_KEY = 'townlet:autosave';
 
 /** Bumped when a save's shape changes; older saves are ignored rather than migrated. */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export type SaveFile = {
   version: typeof SAVE_VERSION;
@@ -29,6 +30,7 @@ function isSaveFile(file: Partial<SaveFile>): file is SaveFile {
   const sim = file.sim;
   if (file.version !== SAVE_VERSION || !sim || !isPaletteName(file.palette ?? '')) return false;
   if (!isDifficulty(sim.difficulty) || typeof sim.seed !== 'string') return false;
+  if (!AGES.includes(sim.age)) return false;
   if (!Array.isArray(sim.buildings) || !Array.isArray(sim.announced)) return false;
   return SNAPSHOT_GRIDS.every((key) => Array.isArray(sim[key]) && sim[key].length === TILE_COUNT);
 }

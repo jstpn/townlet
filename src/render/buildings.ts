@@ -26,6 +26,12 @@ const SERVICE_MODELS: Record<BuildingKind, ModelKey> = {
   policeStation: 'policeStation',
   tree: 'tree',
   plaza: 'plaza',
+  // Stand-ins until build step 2 gives the Forager its own models.
+  camp: 'townHall',
+  tent: 'res1',
+  gatheringHut: 'com1',
+  woodcutter: 'ind1',
+  dryingRack: 'plaza',
 };
 /** Instances per model. Lots can fill most of the map; services and decor cannot. */
 const CAPACITY: Partial<Record<ModelKey, number>> = {

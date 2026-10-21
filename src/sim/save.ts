@@ -19,8 +19,10 @@ type GridKey = (typeof SNAPSHOT_GRIDS)[number];
 const SCALARS = [
   'seed',
   'difficulty',
+  'age',
   'day',
   'money',
+  'stock',
   'nextBuildingId',
   'founded',
   'population',
@@ -59,6 +61,7 @@ export function restoreSim(snap: SimSnapshot): Sim {
   const sim = new Sim({
     seed: snap.seed,
     difficulty: snap.difficulty,
+    age: snap.age,
     terrain: Uint8Array.from(snap.terrain),
     rngState: snap.rng,
   });

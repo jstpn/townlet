@@ -61,6 +61,8 @@ const ERROR_TEXT: Record<CommandError, string> = {
   uneven: 'Services need level ground.',
   'already-built': 'A town has only one town hall.',
   protected: 'The town hall stays.',
+  'wrong-age': 'That belongs to another age.',
+  short: 'The stores are short of materials for that.',
 };
 
 const HINTS = [
