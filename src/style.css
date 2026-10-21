@@ -328,6 +328,10 @@ input[type='range'] {
   transition: opacity 0.6s;
 }
 
+.toast.alarm {
+  background: var(--accent);
+}
+
 .card {
   position: absolute;
   left: 50%;

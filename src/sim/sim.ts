@@ -9,6 +9,7 @@ import {
 import { DIFFICULTY, type Difficulty } from './difficulty';
 import { type Budget, computeHappiness, settleMonth } from './economy';
 import { type Coverage, computeCoverage, computePollution, computeRoadAccess } from './fields';
+import { ignite, monthlyFire, stepFire } from './fire';
 import { TILE_COUNT, clamp, idx, inBounds, lineTiles, rectTiles, snapToAxis, xOf, yOf } from './grid';
 import { type Demand, type Fields, computeDemand, stepGrowth } from './growth';
 import { generateMap } from './mapgen';
@@ -54,7 +55,8 @@ export type SimEvent =
   | { kind: 'service'; building: BuildingKind }
   | { kind: 'population'; count: number }
   | { kind: 'won' }
-  | { kind: 'lost' };
+  | { kind: 'lost' }
+  | { kind: 'fire'; x: number; y: number };
 
 export const DAYS_PER_MONTH = 30;
 export const POPULATION_MILESTONES = [100, 500, 1000, 2500, 5000, 10000];
@@ -81,6 +83,8 @@ export type SimState = {
   /** Days a developed lot has sat near-empty with negative demand, and days it has been undesirable. */
   starveDays: Uint8Array;
   blightDays: Uint8Array;
+  /** Days of burning left on each tile; 0 is not burning. */
+  fire: Uint8Array;
   population: number;
   jobs: number;
   demand: Demand;
@@ -94,7 +98,7 @@ export type SimState = {
   /** Milestones already announced, so each shows once. */
   announced: Set<string>;
   /** Bumped whenever the matching layer changes, so renderers know what to rebuild. */
-  rev: { terrain: number; roads: number; zones: number; buildings: number };
+  rev: { terrain: number; roads: number; zones: number; buildings: number; fire: number };
 };
 
 /** The whole town simulation: state plus the commands that change it. Deterministic, no DOM. */
@@ -127,6 +131,7 @@ export class Sim {
       founded: false,
       starveDays: new Uint8Array(TILE_COUNT),
       blightDays: new Uint8Array(TILE_COUNT),
+      fire: new Uint8Array(TILE_COUNT),
       population: 0,
       jobs: 0,
       demand: { 1: 0, 2: 0, 3: 0 },
@@ -135,7 +140,7 @@ export class Sim {
       budget: { income: 0, expenses: 0, taxes: { 1: 0, 2: 0, 3: 0 }, upkeep: {} },
       status: 'playing',
       announced: new Set(),
-      rev: { terrain: 0, roads: 0, zones: 0, buildings: 0 },
+      rev: { terrain: 0, roads: 0, zones: 0, buildings: 0, fire: 0 },
     };
   }
 
@@ -149,9 +154,12 @@ export class Sim {
     const fields = this.fields();
     s.happiness = computeHappiness(s, fields);
     if (stepGrowth(s, fields, this.rng, settings)) s.rev.zones++;
+    this.burn(fields);
     if (s.day % DAYS_PER_MONTH === 0) {
       s.budget = settleMonth(s, settings);
       s.money += s.budget.income - s.budget.expenses;
+      const started = monthlyFire(s, fields, this.rng, settings);
+      if (started !== undefined) this.events.push({ kind: 'fire', x: xOf(started), y: yOf(started) });
     }
     for (const count of POPULATION_MILESTONES) {
       if (s.population >= count) this.announce(`population:${count}`, { kind: 'population', count });
@@ -160,6 +168,29 @@ export class Sim {
     if (settings.debtLimit !== undefined && s.money < settings.debtLimit) {
       s.status = 'lost';
       this.announce('lost', { kind: 'lost' });
+    }
+  }
+
+  /** Sets fire to a developed lot or a service. For tests and the odd act of arson. */
+  ignite(x: number, y: number): boolean {
+    if (!inBounds(x, y)) return false;
+    const tile = idx(x, y);
+    if (!ignite(this.state, this.fields(), tile)) return false;
+    this.events.push({ kind: 'fire', x, y });
+    return true;
+  }
+
+  /** Fire spreads, counts down and razes what burnt out. */
+  private burn(fields: Fields): void {
+    const { burnt, changed } = stepFire(this.state, fields, this.rng);
+    if (changed) this.state.rev.fire++;
+    for (const tile of burnt) {
+      if (this.state.buildingId[tile] !== -1) this.removeBuilding(tile);
+      else if (this.state.level[tile] > 0) {
+        this.state.level[tile] = 0;
+        this.state.occupancy[tile] = 0;
+        this.state.rev.zones++;
+      }
     }
   }
 

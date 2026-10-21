@@ -303,6 +303,7 @@ export class Hud {
       rows.push(['Upkeep', `${num(def.upkeep)} a month`]);
       if (def.radius > 0) rows.push(['Reach', `${def.radius} tiles`]);
       if (def.jobs > 0) rows.push(['Jobs', `${def.jobs}`]);
+      if (s.fire[t] > 0) rows.push(['On fire', `${s.fire[t]} days left`]);
       if (selectionChanged) {
         this.game.highlight(footprint(b, def.radius).map((tt) => ({ x: xOf(tt), y: yOf(tt) })));
       }
@@ -321,6 +322,7 @@ export class Hud {
         if (!fields.coverage.water[t]) warnings.push('no water');
         if (fields.pollution[t] > 0) warnings.push('smoke');
         if (warnings.length) rows.push(['Needs', warnings.join(', ')]);
+        if (s.fire[t] > 0) rows.push(['On fire', `${s.fire[t]} days left`]);
       } else if (s.road[t]) title = 'Road';
     }
     this.info.append(
@@ -370,8 +372,8 @@ export class Hud {
     );
   }
 
-  private toast(text: string): void {
-    const node = el('div.toast', {}, text);
+  private toast(text: string, alarm = false): void {
+    const node = el(`div.toast${alarm ? '.alarm' : ''}`, {}, text);
     this.toasts.append(node);
     while (this.toasts.childElementCount > 4) this.toasts.firstElementChild?.remove();
     fadeOut(node, 2600, 3200);
@@ -395,6 +397,9 @@ export class Hud {
       }
       case 'lost':
         this.gameOver();
+        break;
+      case 'fire':
+        this.toast(`Fire at ${event.x}, ${event.y}.`, true);
         break;
     }
   }

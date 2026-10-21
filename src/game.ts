@@ -4,6 +4,7 @@ import { Pointer } from './input/pointer';
 import { BuildTool } from './input/tools';
 import { BuildingLayer } from './render/buildings';
 import { CursorLayer } from './render/cursor';
+import { FireLayer } from './render/fire';
 import type { Layer } from './render/layer';
 import { PALETTES, type Palette, type PaletteName } from './render/palette';
 import { GameRenderer } from './render/renderer';
@@ -35,6 +36,7 @@ export class Game {
     new RoadLayer(),
     new ZoneLayer(),
     new BuildingLayer(),
+    new FireLayer(),
   ];
   private readonly cursor = new CursorLayer();
   private readonly ring = new CursorLayer();
