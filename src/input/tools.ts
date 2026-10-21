@@ -26,8 +26,8 @@ export class BuildTool {
   previewRev = 0;
   /** Tile clicked with no tool active, for the info panel. A new object per click. */
   selected: Point | undefined;
-  /** Called with the outcome of every committed gesture. */
-  onCommand: ((result: CommandResult) => void) | undefined;
+  /** Called with the outcome of every committed gesture and the tool that made it. */
+  onCommand: ((result: CommandResult, tool: Tool) => void) | undefined;
   private start: Point | undefined;
   private hover: Point | undefined;
 
@@ -93,7 +93,7 @@ export class BuildTool {
       case 'none':
         return;
     }
-    this.onCommand?.(result);
+    this.onCommand?.(result, this.tool);
   }
 
   private refreshPreview(): void {

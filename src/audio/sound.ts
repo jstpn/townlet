@@ -1,0 +1,197 @@
+/** Short sounds the game can ask for. Everything is synthesised; there are no audio files. */
+export type Cue =
+  'road' | 'zone' | 'building' | 'bulldoze' | 'error' | 'fire' | 'chime' | 'won' | 'lost';
+
+const MUTED_KEY = 'townlet:muted';
+const MASTER = 0.5;
+
+/**
+ * A sea-wash bed with a soft pad underneath, and small plucks and chimes for what the player
+ * does. The context starts on the first gesture, as browsers require, and mute is remembered.
+ */
+export class Sound {
+  muted: boolean;
+  private ctx: AudioContext | undefined;
+  private master: GainNode | undefined;
+  private pad: GainNode | undefined;
+  private wash: BiquadFilterNode | undefined;
+  private night = -1;
+
+  constructor() {
+    this.muted = readMuted();
+    window.addEventListener('pointerdown', this.wake);
+    window.addEventListener('keydown', this.wake);
+  }
+
+  toggle(): void {
+    this.muted = !this.muted;
+    try {
+      localStorage.setItem(MUTED_KEY, this.muted ? '1' : '0');
+    } catch {
+      // Private mode: the choice lasts for this visit.
+    }
+    this.wake();
+    this.master?.gain.setTargetAtTime(this.muted ? 0 : MASTER, this.now(), 0.05);
+  }
+
+  /** 0 by day, 1 at night: the pad drops and the wash softens. */
+  setNight(t: number): void {
+    if (Math.abs(t - this.night) < 0.02 || !this.pad || !this.wash) return;
+    this.night = t;
+    this.pad.gain.setTargetAtTime(0.02 - 0.012 * t, this.now(), 0.5);
+    this.wash.frequency.setTargetAtTime(420 - 140 * t, this.now(), 0.5);
+  }
+
+  play(cue: Cue): void {
+    if (this.muted || !this.ctx || !this.master) return;
+    const t = this.now();
+    switch (cue) {
+      case 'road':
+        this.pluck(t, 'triangle', 330, 220, 0.12, 0.22);
+        break;
+      case 'zone':
+        this.pluck(t, 'sine', 523, 523, 0.1, 0.16);
+        break;
+      case 'building':
+        this.pluck(t, 'triangle', 392, 392, 0.35, 0.18);
+        this.pluck(t + 0.03, 'triangle', 587, 587, 0.35, 0.14);
+        break;
+      case 'bulldoze':
+        this.pluck(t, 'sine', 90, 45, 0.25, 0.4);
+        this.burst(t, 'lowpass', 260, 0.25, 0.5);
+        break;
+      case 'error':
+        this.pluck(t, 'triangle', 300, 300, 0.08, 0.16);
+        this.pluck(t + 0.1, 'triangle', 240, 240, 0.12, 0.16);
+        break;
+      case 'fire':
+        for (let i = 0; i < 5; i++) this.burst(t + i * 0.07, 'bandpass', 1600, 0.08, 0.35);
+        break;
+      case 'chime':
+        this.pluck(t, 'sine', 880, 880, 0.8, 0.16);
+        this.pluck(t, 'sine', 1320, 1320, 0.6, 0.08);
+        break;
+      case 'won':
+        [523, 659, 784, 1047].forEach((f, i) => this.pluck(t + i * 0.12, 'sine', f, f, 0.7, 0.18));
+        break;
+      case 'lost':
+        [392, 349, 294].forEach((f, i) => this.pluck(t + i * 0.25, 'triangle', f, f, 0.6, 0.18));
+        break;
+    }
+  }
+
+  dispose(): void {
+    window.removeEventListener('pointerdown', this.wake);
+    window.removeEventListener('keydown', this.wake);
+    void this.ctx?.close();
+    this.ctx = undefined;
+  }
+
+  /** Starts the context on the first gesture, and resumes it if the browser suspended it. */
+  private readonly wake = (): void => {
+    if (!this.ctx) this.start();
+    else if (this.ctx.state === 'suspended') void this.ctx.resume();
+  };
+
+  private start(): void {
+    const ctx = new AudioContext();
+    this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.gain.value = this.muted ? 0 : MASTER;
+    this.master.connect(ctx.destination);
+
+    // Sea wash: looped noise through a low filter, swelling slowly.
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer(ctx, 3);
+    noise.loop = true;
+    this.wash = ctx.createBiquadFilter();
+    this.wash.type = 'lowpass';
+    this.wash.frequency.value = 420;
+    const washGain = ctx.createGain();
+    washGain.gain.value = 0.05;
+    const swell = ctx.createOscillator();
+    swell.frequency.value = 0.07;
+    const swellDepth = ctx.createGain();
+    swellDepth.gain.value = 0.03;
+    swell.connect(swellDepth).connect(washGain.gain);
+    noise.connect(this.wash).connect(washGain).connect(this.master);
+    noise.start();
+    swell.start();
+
+    // A pad of two soft notes a fifth apart, barely there.
+    this.pad = ctx.createGain();
+    this.pad.gain.value = 0.02;
+    this.pad.connect(this.master);
+    for (const f of [220, 329.6, 221.5]) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      osc.connect(this.pad);
+      osc.start();
+    }
+  }
+
+  private now(): number {
+    return this.ctx?.currentTime ?? 0;
+  }
+
+  /** One note with a quick attack and an exponential decay, optionally gliding in pitch. */
+  private pluck(
+    at: number,
+    type: OscillatorType,
+    from: number,
+    to: number,
+    decay: number,
+    peak: number,
+  ): void {
+    if (!this.ctx || !this.master) return;
+    const osc = this.ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(from, at);
+    if (to !== from) osc.frequency.exponentialRampToValueAtTime(to, at + decay * 0.6);
+    const env = this.ctx.createGain();
+    env.gain.setValueAtTime(0.0001, at);
+    env.gain.exponentialRampToValueAtTime(peak, at + 0.01);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + decay);
+    osc.connect(env).connect(this.master);
+    osc.start(at);
+    osc.stop(at + decay + 0.05);
+  }
+
+  /** A puff of filtered noise. */
+  private burst(
+    at: number,
+    type: BiquadFilterType,
+    frequency: number,
+    decay: number,
+    peak: number,
+  ): void {
+    if (!this.ctx || !this.master) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = noiseBuffer(this.ctx, decay + 0.1);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = frequency;
+    const env = this.ctx.createGain();
+    env.gain.setValueAtTime(peak, at);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + decay);
+    src.connect(filter).connect(env).connect(this.master);
+    src.start(at);
+    src.stop(at + decay + 0.05);
+  }
+}
+
+function noiseBuffer(ctx: AudioContext, seconds: number): AudioBuffer {
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * seconds), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  return buffer;
+}
+
+function readMuted(): boolean {
+  try {
+    return localStorage.getItem(MUTED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}

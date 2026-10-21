@@ -51,9 +51,12 @@ offers Continue when a save exists.
 | 1 to 5                             | Roads, Zones, Services, Decor, Bulldoze                          |
 | Space                              | Pause and resume                                                 |
 | Escape                             | Put the tool down, or open the menu                              |
+| M                                  | Sound on or off                                                  |
 
 The menu holds the palette swatches, the postcard button, which saves a PNG of
-the town from its best angle, and a way to start a new town.
+the town from its best angle, the sound toggle, and a way to start a new town.
+All the sound is synthesised in the browser: a sea wash under a soft pad, and
+small plucks and chimes for what happens in town.
 
 ### Palettes
 

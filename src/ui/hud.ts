@@ -1,3 +1,4 @@
+import type { Cue } from '../audio/sound';
 import type { Game } from '../game';
 import { bindKeys } from '../input/keymap';
 import type { Tool } from '../input/tools';
@@ -39,6 +40,15 @@ const LEVEL_LABEL: Record<ZoneKind, readonly string[]> = {
   [Zone.Residential]: ['Empty lot', 'Cottage', 'Townhouse', 'Apartments'],
   [Zone.Commercial]: ['Empty lot', 'Kiosk', 'Shop', 'Department store'],
   [Zone.Industrial]: ['Empty lot', 'Workshop', 'Factory', 'Plant'],
+};
+
+const EVENT_CUE: Record<SimEvent['kind'], Cue> = {
+  founded: 'chime',
+  service: 'chime',
+  population: 'chime',
+  won: 'won',
+  lost: 'lost',
+  fire: 'fire',
 };
 
 const ERROR_TEXT: Record<CommandError, string> = {
@@ -140,8 +150,13 @@ export class Hud {
     this.budget.hidden = true;
     this.info.hidden = true;
     this.overlay.hidden = true;
-    game.tool.onCommand = (result) => {
-      if (!result.ok) this.toast(ERROR_TEXT[result.reason]);
+    game.tool.onCommand = (result, tool) => {
+      if (result.ok) {
+        if (tool.kind !== 'none') game.sound.play(tool.kind);
+      } else {
+        this.toast(ERROR_TEXT[result.reason]);
+        game.sound.play('error');
+      }
     };
     this.unbindKeys = bindKeys({
       '1': () => this.openCategory(0),
@@ -150,6 +165,7 @@ export class Hud {
       '4': () => this.openCategory(3),
       '5': () => this.openCategory(4),
       ' ': () => this.setSpeed(this.game.speed === 0 ? 1 : 0),
+      m: () => this.toggleSound(),
       escape: () => this.escape(),
     });
     // The first act of every game is placing the town hall, so start with it in hand.
@@ -282,6 +298,12 @@ export class Hud {
     this.category = this.category === i ? -1 : i;
     const items = CATEGORIES[this.category]?.items;
     this.game.tool.setTool(items?.length === 1 && items[0] ? items[0].tool : { kind: 'none' });
+  }
+
+  private toggleSound(): void {
+    this.game.sound.toggle();
+    if (this.paused) this.renderPauseMenu();
+    else this.toast(this.game.sound.muted ? 'Sound off.' : 'Sound on.');
   }
 
   private escape(): void {
@@ -418,6 +440,7 @@ export class Hud {
         this.toast(`Fire at ${event.x}, ${event.y}.`, true);
         break;
     }
+    this.game.sound.play(EVENT_CUE[event.kind]);
   }
 
   /** Title cards show one at a time, each fading after a moment. */
@@ -471,6 +494,11 @@ export class Hud {
       'Paused',
       el('button.primary', { onclick: () => this.resume() }, 'Resume'),
       el('button.ghost', { onclick: () => this.postcard() }, 'Postcard'),
+      el(
+        'button.ghost',
+        { onclick: () => this.toggleSound() },
+        this.game.sound.muted ? 'Sound: off' : 'Sound: on',
+      ),
       el('p.field-label', {}, 'Palette'),
       el(
         'div.swatches',

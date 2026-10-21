@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CameraControls } from './input/controls';
 import { Pointer } from './input/pointer';
+import { Sound } from './audio/sound';
 import { BuildTool } from './input/tools';
 import { BirdLayer } from './render/birds';
 import { BoatLayer } from './render/boats';
@@ -41,6 +42,7 @@ export class Game {
   readonly sim: Sim;
   readonly gfx: GameRenderer;
   readonly tool: BuildTool;
+  readonly sound = new Sound();
   private palette: Palette;
   private readonly buildings = new BuildingLayer();
   private readonly layers: Layer[] = [
@@ -183,6 +185,7 @@ export class Game {
   }
 
   dispose(): void {
+    this.sound.dispose();
     this.controls.dispose();
     this.pointer.dispose();
     this.gfx.dispose();
@@ -207,6 +210,7 @@ export class Game {
     const light = daylight(dayTime / CYCLE_DAYS);
     this.gfx.setDaylight(light);
     this.buildings.setNight(light.night);
+    this.sound.setNight(light.night);
   }
 
   private tick(dt: number): void {
