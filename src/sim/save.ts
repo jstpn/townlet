@@ -1,6 +1,6 @@
 import { type Building, Sim, type SimState } from './sim';
 
-const GRIDS = [
+export const SNAPSHOT_GRIDS = [
   'terrain',
   'road',
   'zone',
@@ -12,7 +12,7 @@ const GRIDS = [
   'fire',
 ] as const;
 
-type GridKey = (typeof GRIDS)[number];
+type GridKey = (typeof SNAPSHOT_GRIDS)[number];
 
 /** Everything else that is saved as is. The snapshot type below fails to compile if one is missing. */
 const SCALARS = [
@@ -44,7 +44,7 @@ function pick<T, K extends keyof T>(from: T, keys: readonly K[]): Pick<T, K> {
 export function snapshot(sim: Sim): SimSnapshot {
   const s = sim.state;
   const grids = {} as Record<GridKey, number[]>;
-  for (const key of GRIDS) grids[key] = Array.from(s[key]);
+  for (const key of SNAPSHOT_GRIDS) grids[key] = Array.from(s[key]);
   return {
     ...pick(s, SCALARS),
     ...grids,
@@ -62,7 +62,7 @@ export function restoreSim(snap: SimSnapshot): Sim {
     rngState: snap.rng,
   });
   const s = sim.state;
-  for (const key of GRIDS) s[key].set(snap[key]);
+  for (const key of SNAPSHOT_GRIDS) s[key].set(snap[key]);
   Object.assign(s, pick(snap, SCALARS));
   s.buildings = new Map(snap.buildings.map((b) => [b.id, b]));
   s.announced = new Set(snap.announced);

@@ -19,6 +19,7 @@ export class FireLayer implements Layer {
   private readonly smoke: THREE.InstancedMesh;
   private readonly smokeMaterial: THREE.MeshStandardMaterial;
   private burning: number[] = [];
+  private palette: Palette | undefined;
   private rev = -1;
   private time = 0;
   private readonly m = new THREE.Matrix4();
@@ -51,7 +52,10 @@ export class FireLayer implements Layer {
   }
 
   sync(state: SimState, palette: Palette): boolean {
-    this.smokeMaterial.color.set(palette.fog).multiplyScalar(0.72);
+    if (palette !== this.palette) {
+      this.palette = palette;
+      this.smokeMaterial.color.set(palette.fog).multiplyScalar(0.72);
+    }
     if (state.rev.fire === this.rev) return false;
     this.rev = state.rev.fire;
     this.burning = [];

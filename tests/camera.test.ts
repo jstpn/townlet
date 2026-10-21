@@ -6,6 +6,15 @@ const settle = (rig: CameraRig): void => {
 };
 
 describe('CameraRig', () => {
+  it('restores a saved pose exactly, clamping zoom and wrapping rotation', () => {
+    const rig = new CameraRig();
+    rig.setPose({ x: 12, z: 40, zoom: 1, rotation: 5 });
+    expect(rig.pose()).toEqual({ x: 12, z: 40, zoom: 6, rotation: 1 });
+    settle(rig);
+    expect(rig.pose()).toEqual({ x: 12, z: 40, zoom: 6, rotation: 1 });
+    expect(rig.zoom).toBe(6);
+  });
+
   it('rotates around four rail positions and wraps', () => {
     const rig = new CameraRig();
     rig.rotate(-1);

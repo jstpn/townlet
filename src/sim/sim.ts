@@ -384,6 +384,7 @@ export class Sim {
       this.clearZone(tile);
       this.removeBuilding(tile);
       this.clearForest(tile);
+      this.extinguish(tile);
     });
   }
 
@@ -438,6 +439,12 @@ export class Sim {
     if (this.state.zone[tile] === zone) return;
     this.state.zone[tile] = zone;
     this.razeLot(tile);
+  }
+
+  private extinguish(tile: number): void {
+    if (this.state.fire[tile] === 0) return;
+    this.state.fire[tile] = 0;
+    this.state.rev.fire++;
   }
 
   /** Back to an empty lot of the same zone. */

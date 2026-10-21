@@ -124,7 +124,8 @@ export class Hud {
     root.append(this.root);
     this.root.append(this.buildTopBar(), this.buildMenu(), this.info, this.budget, this.toasts);
     this.root.append(this.hints, this.overlay);
-    this.showHint();
+    // The three hint cards walk a new town through its first steps; a continued town has had them.
+    if (!game.sim.state.founded) this.showHint();
     this.budget.hidden = true;
     this.info.hidden = true;
     this.overlay.hidden = true;

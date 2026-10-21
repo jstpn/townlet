@@ -141,8 +141,9 @@ export function distanceField(isSource: (tile: number) => boolean): Uint16Array 
 /** v held within [lo, hi]. */
 export const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-/** Shortest route along road tiles from one road tile to another, inclusive, or undefined when disconnected. */
 const cameFrom = new Int32Array(TILE_COUNT);
+
+/** Shortest route along road tiles from one road tile to another, inclusive, or undefined when disconnected. */
 export function roadPath(road: Uint8Array, from: number, to: number): number[] | undefined {
   if (road[from] === 0 || road[to] === 0) return undefined;
   cameFrom.fill(-1);

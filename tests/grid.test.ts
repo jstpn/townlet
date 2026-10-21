@@ -5,6 +5,7 @@ import {
   UNREACHABLE,
   distanceField,
   idx,
+  labelRegions,
   largestRegionSize,
   lineTiles,
   rectTiles,
@@ -76,6 +77,27 @@ describe('lines and rectangles', () => {
   it('covers a rectangle from any two corners and clips it to the map', () => {
     expect(rectTiles(3, 3, 2, 2)).toEqual([idx(2, 2), idx(3, 2), idx(2, 3), idx(3, 3)]);
     expect(rectTiles(-1, 0, 0, 0)).toEqual([idx(0, 0)]);
+  });
+});
+
+describe('labelRegions', () => {
+  it('numbers each 4-connected region and sizes them', () => {
+    const mask = new Uint8Array(TILE_COUNT);
+    for (const [x, y] of [
+      [1, 1],
+      [2, 1],
+      [5, 5],
+      [5, 6],
+      [6, 7],
+    ]) {
+      mask[idx(x, y)] = 1;
+    }
+    const { label, sizes } = labelRegions((tile) => mask[tile] === 1);
+    expect(sizes).toEqual([2, 2, 1]);
+    expect(label[idx(1, 1)]).toBe(label[idx(2, 1)]);
+    expect(label[idx(5, 5)]).toBe(label[idx(5, 6)]);
+    expect(label[idx(6, 7)]).not.toBe(label[idx(5, 6)]);
+    expect(label[idx(0, 0)]).toBe(-1);
   });
 });
 

@@ -69,3 +69,16 @@ describe('fire', () => {
     expect(hard.takeEvents().some((e) => e.kind === 'fire')).toBe(true);
   });
 });
+
+describe('fire and the bulldozer', () => {
+  it('puts the fire out when the burning lot is cleared', () => {
+    const sim = foundedSim({});
+    sim.placeRoadLine(5, 10, 15, 10);
+    block(sim, 10, 11, 10, 11);
+    expect(sim.ignite(10, 11)).toBe(true);
+    expect(sim.bulldozeRect(10, 11, 10, 11).ok).toBe(true);
+    expect(sim.state.fire[idx(10, 11)]).toBe(0);
+    days(sim, 12);
+    expect(sim.state.fire.some((d) => d > 0)).toBe(false);
+  });
+});

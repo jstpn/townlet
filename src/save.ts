@@ -2,7 +2,7 @@ import type { CameraPose } from './render/camera';
 import { type PaletteName, isPaletteName } from './render/palette';
 import { isDifficulty } from './sim/difficulty';
 import { TILE_COUNT } from './sim/grid';
-import type { SimSnapshot } from './sim/save';
+import { SNAPSHOT_GRIDS, type SimSnapshot } from './sim/save';
 
 const KEY = 'townlet:autosave';
 
@@ -16,6 +16,15 @@ export function writeSave(file: SaveFile): void {
   }
 }
 
+/** A shape check, so a truncated or edited save is ignored rather than crashing the restore. */
+function isSaveFile(file: Partial<SaveFile>): file is SaveFile {
+  const sim = file.sim;
+  if (file.version !== 1 || !sim || !isPaletteName(file.palette ?? '')) return false;
+  if (!isDifficulty(sim.difficulty) || typeof sim.seed !== 'string') return false;
+  if (!Array.isArray(sim.buildings) || !Array.isArray(sim.announced)) return false;
+  return SNAPSHOT_GRIDS.every((key) => Array.isArray(sim[key]) && sim[key].length === TILE_COUNT);
+}
+
 export function clearSave(): void {
   localStorage.removeItem(KEY);
 }
@@ -26,9 +35,7 @@ export function readSave(): SaveFile | undefined {
     const raw = localStorage.getItem(KEY);
     if (!raw) return undefined;
     const file = JSON.parse(raw) as Partial<SaveFile>;
-    if (file.version !== 1 || file.sim?.terrain.length !== TILE_COUNT) return undefined;
-    if (!isDifficulty(file.sim.difficulty) || !isPaletteName(file.palette ?? '')) return undefined;
-    return file as SaveFile;
+    return isSaveFile(file) ? file : undefined;
   } catch {
     return undefined;
   }

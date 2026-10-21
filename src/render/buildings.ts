@@ -139,10 +139,8 @@ export class BuildingLayer implements Layer {
       const size = BUILDINGS[b.kind].size;
       const key = SERVICE_MODELS[b.kind];
       const yaw = this.facing(state, b.x, b.y, size);
-      this.place(key, b.x, b.y, size, yaw, tileHash(b.x, b.y, 5));
-      if (b.kind === 'windTurbine') {
-        this.turbines.push(this.m.clone());
-      }
+      const placed = this.place(key, b.x, b.y, size, yaw, tileHash(b.x, b.y, 5));
+      if (placed && b.kind === 'windTurbine') this.turbines.push(this.m.clone());
     }
     for (const [key, parts] of this.meshes) {
       const count = this.counts.get(key) ?? 0;
@@ -184,7 +182,7 @@ export class BuildingLayer implements Layer {
     return Math.atan2(dx, dy);
   }
 
-  /** Writes one instance of `key` at tile (x, y), leaving its matrix in `this.m`. */
+  /** Writes one instance of `key` at tile (x, y), leaving its matrix in `this.m`. False when full. */
   private place(
     key: ModelKey,
     x: number,
@@ -192,11 +190,11 @@ export class BuildingLayer implements Layer {
     size: number,
     yaw: number,
     variant: number,
-  ): void {
+  ): boolean {
     const model = this.models[key];
     const parts = this.meshes.get(key);
     const i = this.counts.get(key) ?? 0;
-    if (!parts || !this.colors || i >= (this.capacity.get(key) ?? 0)) return;
+    if (!parts || !this.colors || i >= (this.capacity.get(key) ?? 0)) return false;
     this.counts.set(key, i + 1);
     const half = size / 2;
     this.m.makeTranslation(x + half, 0, y + half);
@@ -216,6 +214,7 @@ export class BuildingLayer implements Layer {
       this.m2.premultiply(this.m);
       this.windows.setMatrixAt(this.windowCount++, this.m2);
     }
+    return true;
   }
 }
 
