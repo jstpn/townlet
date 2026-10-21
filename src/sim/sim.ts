@@ -6,6 +6,7 @@ import {
   type BuildingKind,
 } from './catalogue';
 import { DIFFICULTY, type Difficulty } from './difficulty';
+import { type Budget, computeHappiness, settleMonth } from './economy';
 import { type Coverage, computeCoverage, computePollution, computeRoadAccess } from './fields';
 import { TILE_COUNT, idx, inBounds, lineTiles, rectTiles, snapToAxis, xOf, yOf } from './grid';
 import { type Demand, computeDemand, stepGrowth } from './growth';
@@ -44,6 +45,20 @@ export type Plan = { tiles: PlanTile[]; cost: number; error?: CommandError };
 
 export type Building = { id: number; kind: BuildingKind; x: number; y: number };
 
+export type GameStatus = 'playing' | 'won' | 'lost';
+
+/** Something worth telling the player about, drained by the HUD with `takeEvents`. */
+export type SimEvent =
+  | { kind: 'founded' }
+  | { kind: 'service'; building: BuildingKind }
+  | { kind: 'population'; count: number }
+  | { kind: 'won' }
+  | { kind: 'lost' };
+
+export const DAYS_PER_MONTH = 30;
+export const POPULATION_MILESTONES = [100, 500, 1000, 2500, 5000, 10000];
+export const MAX_TAX_RATE = 20;
+
 export type SimState = {
   seed: string;
   difficulty: Difficulty;
@@ -67,8 +82,15 @@ export type SimState = {
   population: number;
   jobs: number;
   demand: Demand;
-  /** 0 to 100. Computed by the economy; lots empty out below the difficulty's leave threshold. */
+  /** 0 to 100. Computed daily; lots empty out below the difficulty's leave threshold. */
   happiness: number;
+  /** Percent, 0 to 20. */
+  taxRate: number;
+  /** Last month's settlement. */
+  budget: Budget;
+  status: GameStatus;
+  /** Milestones already announced, so each shows once. */
+  announced: Set<string>;
   /** Bumped whenever the matching layer changes, so renderers know what to rebuild. */
   rev: { terrain: number; roads: number; zones: number; buildings: number };
 };
@@ -77,6 +99,7 @@ export type SimState = {
 export class Sim {
   readonly state: SimState;
   private readonly rng: Rng;
+  private events: SimEvent[] = [];
   private readonly cache = {
     coverage: { rev: -1, value: undefined as Coverage | undefined },
     roadAccess: { rev: -1, value: undefined as Uint8Array | undefined },
@@ -106,13 +129,19 @@ export class Sim {
       jobs: 0,
       demand: { residential: 0, commercial: 0, industrial: 0 },
       happiness: 100,
+      taxRate: 10,
+      budget: { income: 0, expenses: 0 },
+      status: 'playing',
+      announced: new Set(),
       rev: { terrain: 0, roads: 0, zones: 0, buildings: 0 },
     };
   }
 
-  /** Advances one game day: demand, then growth on every lot. */
+  /** Advances one game day: demand, happiness, growth on every lot, and the budget on month days. */
   step(): void {
     const s = this.state;
+    if (s.status === 'lost') return;
+    const settings = DIFFICULTY[s.difficulty];
     s.day++;
     Object.assign(s, computeDemand(s));
     const fields = {
@@ -120,7 +149,39 @@ export class Sim {
       roadAccess: this.roadAccess(),
       pollution: this.pollution(),
     };
-    if (stepGrowth(s, fields, this.rng, DIFFICULTY[s.difficulty])) s.rev.zones++;
+    s.happiness = computeHappiness(s, fields);
+    if (stepGrowth(s, fields, this.rng, settings)) s.rev.zones++;
+    if (s.day % DAYS_PER_MONTH === 0) {
+      s.budget = settleMonth(s, settings);
+      s.money += s.budget.income - s.budget.expenses;
+    }
+    for (const count of POPULATION_MILESTONES) {
+      if (s.population >= count) this.announce(`population:${count}`, { kind: 'population', count });
+    }
+    if (s.population >= settings.winTarget && this.announce('won', { kind: 'won' })) s.status = 'won';
+    if (settings.debtLimit !== undefined && s.money < settings.debtLimit) {
+      s.status = 'lost';
+      this.announce('lost', { kind: 'lost' });
+    }
+  }
+
+  setTaxRate(rate: number): void {
+    this.state.taxRate = Math.max(0, Math.min(MAX_TAX_RATE, Math.round(rate)));
+  }
+
+  /** Returns and clears the events raised since the last call. */
+  takeEvents(): SimEvent[] {
+    const events = this.events;
+    this.events = [];
+    return events;
+  }
+
+  /** Raises an event the first time its key is seen. Returns true when it was new. */
+  private announce(key: string, event: SimEvent): boolean {
+    if (this.state.announced.has(key)) return false;
+    this.state.announced.add(key);
+    this.events.push(event);
+    return true;
   }
 
   coverage(): Coverage {
@@ -249,6 +310,10 @@ export class Sim {
       this.state.buildingId[tile] = id;
     });
     this.state.rev.buildings++;
+    if (kind === 'townHall') this.announce('founded', { kind: 'founded' });
+    else if (BUILDINGS[kind].services.length > 0) {
+      this.announce(`service:${kind}`, { kind: 'service', building: kind });
+    }
     return result;
   }
 
@@ -298,7 +363,9 @@ export class Sim {
   }
 
   private priced(tiles: PlanTile[], cost: number): Plan {
-    return cost > this.state.money ? { tiles, cost, error: 'insufficient-funds' } : { tiles, cost };
+    return cost > 0 && cost > this.state.money
+      ? { tiles, cost, error: 'insufficient-funds' }
+      : { tiles, cost };
   }
 
   /** Shared validation for tile-painting plans: needs a town hall, something to change, and funds. */

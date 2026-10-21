@@ -62,14 +62,20 @@ describe('growth', () => {
 
   it('empties lots when the town is unhappy', () => {
     const sim = town();
-    sim.zoneRect(Zone.Residential, 30, 34, 30, 34);
-    const lot = idx(30, 34);
-    sim.state.level[lot] = 2;
-    sim.state.occupancy[lot] = 0.5;
-    sim.state.happiness = 0;
+    sim.placeRoadLine(8, 12, 12, 12);
+    sim.zoneRect(Zone.Residential, 10, 10, 10, 10);
+    sim.zoneRect(Zone.Industrial, 10, 11, 10, 11);
+    const home = idx(10, 10);
+    sim.state.level[home] = 2;
+    sim.state.occupancy[home] = 0.5;
+    sim.state.level[idx(10, 11)] = 3;
+    sim.state.occupancy[idx(10, 11)] = 1;
+    sim.state.rev.zones++;
+    sim.setTaxRate(20);
     days(sim, 20);
-    expect(sim.state.occupancy[lot]).toBe(0);
-    expect(sim.state.level[lot]).toBe(2);
+    expect(sim.state.happiness).toBeLessThan(40);
+    expect(sim.state.occupancy[home]).toBe(0);
+    expect(sim.state.level[home]).toBe(2);
   });
 
   it('demotes blighted lots after sixty days', () => {
