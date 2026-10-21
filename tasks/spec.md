@@ -80,16 +80,21 @@ Each zoned tile holds a level 0 to 3 and an occupancy 0 to 1.
 | Industrial capacity (jobs)       | 5       | 12      | 25      |
 
 Population is the sum of residential capacity times occupancy. Workers are
-population times 0.6. Jobs are commercial plus industrial capacity times
+population times 0.4. Jobs are commercial plus industrial capacity times
 occupancy, plus the town hall's 20.
 
 Demand, each clamped to -1 to 1, recomputed daily, shown as the three-bar gauge:
 
 - Residential: (jobs - workers) / max(jobs, 20), plus a 0.2 baseline that fades
   to 0 by 500 residents.
-- Commercial: (population / 4 - commercial jobs) / max(population / 4, 10).
-- Industrial: (population / 6 - industrial jobs) / max(population / 6, 10),
+- Commercial: (population / 3 - commercial jobs) / max(population / 3, 10),
+  plus a 0.1 baseline.
+- Industrial: (population / 5 - industrial jobs) / max(population / 5, 10),
   plus a 0.15 export baseline.
+
+The job targets add up to more than the workers, so a town that keeps up with
+its shops and factories always has room for more homes (the balance pass found
+the old 0.6 workers stalled every town near 300 residents).
 
 Hard requirements for any development: power coverage and water coverage.
 Without both, the tile shows a warning marker and never grows.
@@ -162,7 +167,7 @@ residents; the first of each service; win; game over.
 | Starting money              | 20000 | 10000  | 6000  |
 | Cost multiplier             | 0.8   | 1.0    | 1.25  |
 | Upkeep multiplier           | 0.8   | 1.0    | 1.3   |
-| Growth rate                 | 0.10  | 0.08   | 0.06  |
+| Growth rate                 | 0.05  | 0.035  | 0.025 |
 | Leave threshold (happiness) | 30    | 40     | 50    |
 | Fire chance per month       | 0     | 0.15   | 0.5   |
 | Debt limit                  | none  | -5000  | -2000 |

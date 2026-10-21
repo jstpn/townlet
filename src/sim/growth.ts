@@ -30,16 +30,20 @@ export function computeDemand(state: SimState): {
   let serviceJobs = 0;
   for (const b of state.buildings.values()) serviceJobs += BUILDINGS[b.kind].jobs;
   const jobs = commercialJobs + industrialJobs + serviceJobs;
-  const workers = population * 0.6;
+  // Four in ten residents work; shops want a job per three residents and industry one per five,
+  // so a town that keeps up with its shops and factories always has room for more homes.
+  const workers = population * 0.4;
   const baseline = 0.2 * Math.max(0, 1 - population / 500);
   return {
     population,
     jobs,
     demand: {
       [Zone.Residential]: clamp1((jobs - workers) / Math.max(jobs, 20) + baseline),
-      [Zone.Commercial]: clamp1((population / 4 - commercialJobs) / Math.max(population / 4, 10)),
+      [Zone.Commercial]: clamp1(
+        (population / 3 - commercialJobs) / Math.max(population / 3, 10) + 0.1,
+      ),
       [Zone.Industrial]: clamp1(
-        (population / 6 - industrialJobs) / Math.max(population / 6, 10) + 0.15,
+        (population / 5 - industrialJobs) / Math.max(population / 5, 10) + 0.15,
       ),
     },
   };

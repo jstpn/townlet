@@ -17,7 +17,7 @@ describe('demand', () => {
     sim.step();
     expect(sim.state.day).toBe(1);
     expect(sim.state.demand[Zone.Residential]).toBe(1);
-    expect(sim.state.demand[Zone.Commercial]).toBe(0);
+    expect(sim.state.demand[Zone.Commercial]).toBeCloseTo(0.1);
     expect(sim.state.demand[Zone.Industrial]).toBeCloseTo(0.15);
     expect(sim.state.population).toBe(0);
     expect(sim.state.jobs).toBe(20);
