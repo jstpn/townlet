@@ -21,6 +21,8 @@ export type Palette = {
   sun: string;
   night: string;
   accent: string;
+  /** Undeveloped lot tints for residential, commercial and industrial zones. */
+  zones: readonly [string, string, string];
 };
 
 export const PALETTE_NAMES = ['budapest', 'moonrise', 'darjeeling', 'asteroid'] as const;
@@ -49,6 +51,7 @@ export const PALETTES: Record<PaletteName, Palette> = {
     sun: '#fff0d6',
     night: '#4a3b63',
     accent: '#c4453a',
+    zones: ['#d9a8b6', '#8fb3c9', '#c9b27a'],
   },
   moonrise: {
     name: 'moonrise',
@@ -72,6 +75,7 @@ export const PALETTES: Record<PaletteName, Palette> = {
     sun: '#fff0c4',
     night: '#3f4a55',
     accent: '#b5513c',
+    zones: ['#d9b48a', '#8da79a', '#c2a26a'],
   },
   darjeeling: {
     name: 'darjeeling',
@@ -95,6 +99,7 @@ export const PALETTES: Record<PaletteName, Palette> = {
     sun: '#fff2d0',
     night: '#2f4858',
     accent: '#e9a13b',
+    zones: ['#d7a07c', '#7ea7a0', '#c7a85f'],
   },
   asteroid: {
     name: 'asteroid',
@@ -118,6 +123,7 @@ export const PALETTES: Record<PaletteName, Palette> = {
     sun: '#fff3d8',
     night: '#4a4a6a',
     accent: '#c4663c',
+    zones: ['#d8b79a', '#9fb3a8', '#c0a97e'],
   },
 };
 

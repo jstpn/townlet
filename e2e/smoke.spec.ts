@@ -27,6 +27,18 @@ test('boots, lays a road by dragging across land, and renders without errors', a
     throw new Error('no grass run found');
   });
 
+  // Found the town first: the hall is a 2x2 placed by clicking its top-left tile.
+  await page.evaluate(({ x, y }) => {
+    const { sim } = window.townlet;
+    for (let yy = 0; yy < 64; yy++) {
+      for (let xx = 0; xx < 64; xx++) {
+        if (Math.abs(yy - y) < 3 && Math.abs(xx - x) < 7) continue;
+        if (sim.placeBuilding('townHall', xx, yy).ok) return;
+      }
+    }
+    throw new Error('nowhere to found the town');
+  }, target);
+
   await page.keyboard.press('1');
   await page.mouse.move(target.from.x, target.from.y);
   await page.mouse.down();

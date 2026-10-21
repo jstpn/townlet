@@ -4,8 +4,11 @@ import { Sim } from '../src/sim/sim';
 import { Terrain } from '../src/sim/types';
 import { flatTerrain } from './helpers';
 
-const newSim = (terrain = flatTerrain(Terrain.Grass)): Sim =>
-  new Sim({ seed: 'test', difficulty: 'normal', terrain });
+const newSim = (terrain = flatTerrain(Terrain.Grass), money?: number): Sim => {
+  const sim = new Sim({ seed: 'test', difficulty: 'normal', terrain, money });
+  if (terrain[idx(30, 30)] !== Terrain.Water) sim.placeBuilding('townHall', 30, 30);
+  return sim;
+};
 
 describe('roads', () => {
   it('places a road on grass and charges for it', () => {
@@ -17,7 +20,9 @@ describe('roads', () => {
   });
 
   it('refuses water and reports why', () => {
-    const sim = newSim(flatTerrain(Terrain.Water));
+    const terrain = flatTerrain(Terrain.Water);
+    for (const t of [idx(30, 30), idx(31, 30), idx(30, 31), idx(31, 31)]) terrain[t] = Terrain.Grass;
+    const sim = newSim(terrain);
     expect(sim.placeRoadLine(10, 10, 10, 10)).toEqual({ ok: false, reason: 'water' });
     expect(sim.state.road[idx(10, 10)]).toBe(0);
   });
@@ -72,12 +77,7 @@ describe('roads and the land', () => {
   });
 
   it('refuses when the town cannot afford it', () => {
-    const sim = new Sim({
-      seed: 't',
-      difficulty: 'normal',
-      terrain: flatTerrain(Terrain.Grass),
-      money: 25,
-    });
+    const sim = newSim(flatTerrain(Terrain.Grass), 25);
     expect(sim.placeRoadLine(0, 0, 0, 2)).toEqual({ ok: false, reason: 'insufficient-funds' });
     expect(sim.state.money).toBe(25);
   });
@@ -113,7 +113,9 @@ describe('revision counters', () => {
   });
 
   it('stay put when a command is refused', () => {
-    const sim = newSim(flatTerrain(Terrain.Water));
+    const terrain = flatTerrain(Terrain.Water);
+    for (const t of [idx(30, 30), idx(31, 30), idx(30, 31), idx(31, 31)]) terrain[t] = Terrain.Grass;
+    const sim = newSim(terrain);
     const before = { ...sim.state.rev };
     sim.placeRoadLine(2, 5, 6, 5);
     sim.bulldozeRect(2, 5, 6, 5);
@@ -139,6 +141,8 @@ describe('difficulty', () => {
     const hard = new Sim({ seed: 't', difficulty: 'hard', terrain: grass });
     expect(easy.state.money).toBe(20000);
     expect(hard.state.money).toBe(6000);
+    easy.placeBuilding('townHall', 30, 30);
+    hard.placeBuilding('townHall', 30, 30);
     expect(easy.placeRoadLine(1, 1, 1, 1)).toEqual({ ok: true, cost: 8 });
     expect(hard.placeRoadLine(1, 1, 1, 1)).toEqual({ ok: true, cost: 13 });
     expect(hard.bulldozeRect(1, 1, 1, 1)).toEqual({ ok: true, cost: 3 });

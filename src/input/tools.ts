@@ -1,10 +1,17 @@
 import type { CameraRig } from '../render/camera';
 import type { PreviewTint } from '../render/cursor';
+import type { BuildingKind } from '../sim/catalogue';
 import type { Point } from '../sim/grid';
 import type { Plan, Sim } from '../sim/sim';
+import type { ZoneKind } from '../sim/types';
 import type { Pointer } from './pointer';
 
-export type Tool = { kind: 'none' } | { kind: 'road' } | { kind: 'bulldoze' };
+export type Tool =
+  | { kind: 'none' }
+  | { kind: 'road' }
+  | { kind: 'bulldoze' }
+  | { kind: 'zone'; zone: ZoneKind }
+  | { kind: 'building'; building: BuildingKind };
 
 export type Preview = { plan: Plan; tint: PreviewTint };
 
@@ -50,8 +57,31 @@ export class BuildTool {
         return this.sim.planRoadLine(from.x, from.y, to.x, to.y);
       case 'bulldoze':
         return this.sim.planBulldozeRect(from.x, from.y, to.x, to.y);
+      case 'zone':
+        return this.sim.planZoneRect(this.tool.zone, from.x, from.y, to.x, to.y);
+      case 'building':
+        return this.sim.planBuilding(this.tool.building, to.x, to.y);
       case 'none':
         return undefined;
+    }
+  }
+
+  private commit(from: Point, to: Point): void {
+    switch (this.tool.kind) {
+      case 'road':
+        this.sim.placeRoadLine(from.x, from.y, to.x, to.y);
+        break;
+      case 'bulldoze':
+        this.sim.bulldozeRect(from.x, from.y, to.x, to.y);
+        break;
+      case 'zone':
+        this.sim.zoneRect(this.tool.zone, from.x, from.y, to.x, to.y);
+        break;
+      case 'building':
+        this.sim.placeBuilding(this.tool.building, to.x, to.y);
+        break;
+      case 'none':
+        break;
     }
   }
 
@@ -74,13 +104,7 @@ export class BuildTool {
   private readonly onPointerUp = (button: number): void => {
     if (button !== 0 || !this.start) return;
     const end = this.hover;
-    if (end) {
-      if (this.tool.kind === 'road')
-        this.sim.placeRoadLine(this.start.x, this.start.y, end.x, end.y);
-      else if (this.tool.kind === 'bulldoze') {
-        this.sim.bulldozeRect(this.start.x, this.start.y, end.x, end.y);
-      }
-    }
+    if (end) this.commit(this.start, end);
     this.start = undefined;
     this.refreshPreview();
   };

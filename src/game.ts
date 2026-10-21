@@ -3,6 +3,7 @@ import { CameraControls } from './input/controls';
 import { bindKeys } from './input/keymap';
 import { Pointer } from './input/pointer';
 import { BuildTool } from './input/tools';
+import { BuildingLayer } from './render/buildings';
 import { CursorLayer } from './render/cursor';
 import type { Layer } from './render/layer';
 import { PALETTES, type Palette, type PaletteName } from './render/palette';
@@ -10,8 +11,10 @@ import { GameRenderer } from './render/renderer';
 import { RoadLayer } from './render/roads';
 import { TerrainLayer } from './render/terrain';
 import { WaterLayer } from './render/water';
+import { ZoneLayer } from './render/zones';
 import type { Difficulty } from './sim/difficulty';
 import { Sim } from './sim/sim';
+import { Zone } from './sim/types';
 
 export type GameOptions = {
   seed: string;
@@ -25,7 +28,13 @@ export class Game {
   readonly gfx: GameRenderer;
   readonly tool: BuildTool;
   private palette: Palette;
-  private readonly layers: Layer[] = [new WaterLayer(), new TerrainLayer(), new RoadLayer()];
+  private readonly layers: Layer[] = [
+    new WaterLayer(),
+    new TerrainLayer(),
+    new RoadLayer(),
+    new ZoneLayer(),
+    new BuildingLayer(),
+  ];
   private readonly cursor = new CursorLayer();
   private readonly pointer: Pointer;
   private readonly controls: CameraControls;
@@ -46,6 +55,11 @@ export class Game {
       q: () => this.gfx.rig.rotate(-1),
       e: () => this.gfx.rig.rotate(1),
       '1': () => this.tool.setTool({ kind: 'road' }),
+      '2': () => this.tool.setTool({ kind: 'zone', zone: Zone.Residential }),
+      '3': () => this.tool.setTool({ kind: 'zone', zone: Zone.Commercial }),
+      '4': () => this.tool.setTool({ kind: 'zone', zone: Zone.Industrial }),
+      t: () => this.tool.setTool({ kind: 'building', building: 'townHall' }),
+      p: () => this.tool.setTool({ kind: 'building', building: 'park' }),
       b: () => this.tool.setTool({ kind: 'bulldoze' }),
       escape: () => this.tool.setTool({ kind: 'none' }),
     });

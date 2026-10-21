@@ -5,12 +5,13 @@ import type { CameraRig } from '../src/render/camera';
 import type { Point } from '../src/sim/grid';
 import { idx } from '../src/sim/grid';
 import { Sim } from '../src/sim/sim';
-import { Terrain } from '../src/sim/types';
+import { Terrain, Zone } from '../src/sim/types';
 import { flatTerrain } from './helpers';
 
 /** Drives a BuildTool with a fake pointer and a camera that reports whatever tile we say. */
 function harness() {
   const sim = new Sim({ seed: 't', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
+  sim.placeBuilding('townHall', 30, 30);
   let under: Point | undefined;
   const handlers = {
     down: [] as ((b: number) => void)[],
@@ -125,5 +126,29 @@ describe('BuildTool', () => {
     expect(h.sim.state.road[idx(3, 3)]).toBe(0);
     expect(h.sim.state.road[idx(4, 3)]).toBe(0);
     expect(h.sim.state.road[idx(5, 3)]).toBe(1);
+  });
+});
+
+describe('zone and building tools', () => {
+  it('paints a zone rectangle on release', () => {
+    const h = harness();
+    h.tool.setTool({ kind: 'zone', zone: Zone.Commercial });
+    h.hoverAt({ x: 3, y: 3 });
+    h.press();
+    h.hoverAt({ x: 5, y: 4 });
+    expect(h.tool.preview?.plan.tiles).toHaveLength(6);
+    h.release();
+    expect(h.sim.state.zone[idx(5, 4)]).toBe(Zone.Commercial);
+  });
+
+  it('previews a building footprint under the pointer and places it on click', () => {
+    const h = harness();
+    h.tool.setTool({ kind: 'building', building: 'school' });
+    h.hoverAt({ x: 10, y: 10 });
+    expect(h.tool.preview?.plan.tiles).toHaveLength(4);
+    h.press();
+    h.release();
+    expect(h.sim.state.buildings.size).toBe(2);
+    expect(h.sim.state.buildingId[idx(11, 11)]).toBeGreaterThan(0);
   });
 });

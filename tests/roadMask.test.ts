@@ -7,6 +7,7 @@ import { flatTerrain } from './helpers';
 describe('roadConnections', () => {
   it('reports which neighbours a road tile joins, as N E S W bits', () => {
     const sim = new Sim({ seed: 't', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
+    sim.placeBuilding('townHall', 30, 30);
     sim.placeRoadLine(2, 5, 6, 5);
     sim.placeRoadLine(4, 5, 4, 7);
     const road = sim.state.road;
