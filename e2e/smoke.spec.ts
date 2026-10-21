@@ -90,3 +90,14 @@ test('autosaves after a command and continues from the save', async ({ page }) =
   }));
   expect(after).toEqual({ roads: 21, founded: true, palette: 'darjeeling', rotation: 1 });
 });
+
+test('the pause menu postcard downloads a PNG', async ({ page }) => {
+  await page.goto('/?seed=budapest');
+  await page.getByRole('button', { name: 'Found the town' }).click();
+  await page.waitForFunction(() => window.townlet !== undefined);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Menu' }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Postcard' }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.png$/);
+});

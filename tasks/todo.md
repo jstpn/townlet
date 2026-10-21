@@ -18,8 +18,8 @@ Spec: tasks/spec.md. Tick as you go. Review rounds after every 3 or 4 code commi
 - [x] 10. Fire: sim and effects, tests
 - [x] 11. Cars on the road graph
 - [x] 12. Autosave and continue, tests
-- [ ] Review round C
-- [ ] 13. Post-processing, day and night polish, postcard
+- [x] Review round C
+- [x] 13. Post-processing, day and night polish, postcard
 - [ ] 14. Balance pass with the autoplayer test
 - [ ] 15. Playwright smoke, README with screenshots
 - [ ] Review round D

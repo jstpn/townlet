@@ -5,8 +5,10 @@ import { BuildTool } from './input/tools';
 import { BuildingLayer } from './render/buildings';
 import { CarLayer } from './render/cars';
 import { CursorLayer } from './render/cursor';
+import { CYCLE_DAYS, daylight } from './render/daylight';
 import { FireLayer } from './render/fire';
 import type { Layer } from './render/layer';
+import type { CameraPose } from './render/camera';
 import { PALETTES, type Palette, type PaletteName } from './render/palette';
 import { GameRenderer } from './render/renderer';
 import { RoadLayer } from './render/roads';
@@ -15,11 +17,13 @@ import { WaterLayer } from './render/water';
 import { ZoneLayer } from './render/zones';
 import type { Difficulty } from './sim/difficulty';
 import { type SaveFile, clearSave, writeSave } from './save';
-import type { Point } from './sim/grid';
+import { MAP_SIZE, TILE_COUNT, type Point, xOf, yOf } from './sim/grid';
 import { restoreSim, snapshot } from './sim/save';
 import { Sim } from './sim/sim';
 
 const DAY_SECONDS = 0.5;
+/** A new town is founded in the morning, not in the dark. */
+const START_PHASE = 0.25;
 
 export type GameOptions = {
   seed: string;
@@ -33,12 +37,13 @@ export class Game {
   readonly gfx: GameRenderer;
   readonly tool: BuildTool;
   private palette: Palette;
+  private readonly buildings = new BuildingLayer();
   private readonly layers: Layer[] = [
     new WaterLayer(),
     new TerrainLayer(),
     new RoadLayer(),
     new ZoneLayer(),
-    new BuildingLayer(),
+    this.buildings,
     new CarLayer(),
     new FireLayer(),
   ];
@@ -103,6 +108,50 @@ export class Game {
     this.savedRev = this.sim.state.rev.save;
   }
 
+  /**
+   * Renders the town from the postcard angle, fitted to what has been built, with a title card,
+   * and hands back the picture. The camera goes back to where it was afterwards.
+   */
+  postcard(title: string, subtitle: string): HTMLCanvasElement {
+    const pose = this.gfx.rig.pose();
+    this.gfx.rig.setPose(this.fitBuiltArea());
+    this.syncLayers();
+    this.gfx.render();
+    const source = this.gfx.canvas;
+    const card = document.createElement('canvas');
+    card.width = source.width;
+    card.height = source.height;
+    const ctx = card.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(source, 0, 0);
+      drawTitleCard(ctx, card.width, card.height, title, subtitle);
+    }
+    this.gfx.rig.setPose(pose);
+    return card;
+  }
+
+  /** The postcard pose: rotation 0, centred on the built tiles, zoomed so they fill the frame. */
+  private fitBuiltArea(): CameraPose {
+    const s = this.sim.state;
+    let x0 = MAP_SIZE;
+    let y0 = MAP_SIZE;
+    let x1 = -1;
+    let y1 = -1;
+    for (let tile = 0; tile < TILE_COUNT; tile++) {
+      if (s.road[tile] === 0 && s.buildingId[tile] === -1 && s.zone[tile] === 0) continue;
+      x0 = Math.min(x0, xOf(tile));
+      y0 = Math.min(y0, yOf(tile));
+      x1 = Math.max(x1, xOf(tile) + 1);
+      y1 = Math.max(y1, yOf(tile) + 1);
+    }
+    if (x1 < 0) return { x: MAP_SIZE / 2, z: MAP_SIZE / 2, zoom: 44, rotation: 0 };
+    const span = x1 - x0 + (y1 - y0);
+    const aspect = this.gfx.canvas.clientWidth / Math.max(1, this.gfx.canvas.clientHeight);
+    // At 45 degrees the box projects to a diamond span/sqrt2 wide and about 0.58 of that tall.
+    const zoom = Math.max(0.21 * span, (0.36 * span) / aspect) * 1.15 + 3;
+    return { x: (x0 + x1) / 2, z: (y0 + y1) / 2, zoom, rotation: 0 };
+  }
+
   dispose(): void {
     this.controls.dispose();
     this.pointer.dispose();
@@ -119,8 +168,16 @@ export class Game {
     for (const layer of this.layers) layer.animate?.(dt);
     this.onFrame?.();
     this.syncLayers();
-    this.gfx.render();
+    this.lightForTimeOfDay();
+    this.gfx.render(dt);
   };
+
+  private lightForTimeOfDay(): void {
+    const dayTime = this.sim.state.day + this.dayClock / DAY_SECONDS;
+    const light = daylight((dayTime % CYCLE_DAYS) / CYCLE_DAYS + START_PHASE);
+    this.gfx.setDaylight(light);
+    this.buildings.setNight(light.night);
+  }
 
   private tick(dt: number): void {
     this.dayClock += dt * this.speed;
@@ -145,4 +202,36 @@ export class Game {
       else this.cursor.clear();
     }
   }
+}
+
+function drawTitleCard(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  title: string,
+  subtitle: string,
+): void {
+  const scale = width / 1440;
+  const pad = 40 * scale;
+  const cardW = 520 * scale;
+  const cardH = 150 * scale;
+  const x = pad;
+  const y = height - pad - cardH;
+  ctx.fillStyle = 'rgba(28, 24, 20, 0.12)';
+  ctx.fillRect(x + 6 * scale, y + 8 * scale, cardW, cardH);
+  ctx.fillStyle = '#f6efe2';
+  ctx.fillRect(x, y, cardW, cardH);
+  ctx.fillStyle = '#d5473a';
+  ctx.fillRect(x, y, 8 * scale, cardH);
+  ctx.fillStyle = '#1c1814';
+  ctx.font = `500 ${44 * scale}px 'Jost Variable', 'Futura', sans-serif`;
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(title, x + 32 * scale, y + 68 * scale);
+  ctx.font = `400 ${22 * scale}px 'Jost Variable', 'Futura', sans-serif`;
+  ctx.fillStyle = '#6b625a';
+  ctx.fillText(subtitle, x + 32 * scale, y + 108 * scale);
+  ctx.font = `600 ${14 * scale}px 'Jost Variable', 'Futura', sans-serif`;
+  ctx.fillStyle = '#1c1814';
+  ctx.letterSpacing = `${3 * scale}px`;
+  ctx.fillText('TOWNLET', x + cardW - 120 * scale, y + cardH - 24 * scale);
 }

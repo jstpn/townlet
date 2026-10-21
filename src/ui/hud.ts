@@ -19,6 +19,7 @@ import { Terrain, Zone, ZONE_KINDS, type ZoneKind } from '../sim/types';
 import { formatDate } from './calendar';
 import { clear, el, num } from './dom';
 import { paletteSwatch } from './swatch';
+import { townName } from './townName';
 
 type MenuItem = { label: string; cost: number; tool: Tool };
 type Category = { label: string; items: MenuItem[] };
@@ -450,6 +451,7 @@ export class Hud {
     this.showOverlay(
       'Paused',
       el('button.primary', { onclick: () => this.resume() }, 'Resume'),
+      el('button.ghost', { onclick: () => this.postcard() }, 'Postcard'),
       el('p.field-label', {}, 'Palette'),
       el(
         'div.swatches',
@@ -463,6 +465,20 @@ export class Hud {
       ),
       el('button.ghost', { onclick: () => this.callbacks.onNewTown() }, 'New town'),
     );
+  }
+
+  /** Saves a PNG of the town from the postcard angle. */
+  private postcard(): void {
+    const s = this.game.sim.state;
+    const name = townName(s.seed);
+    const card = this.game.postcard(name, formatDate(s.day));
+    card.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = el<HTMLAnchorElement>('a', { href: url, download: `${name.toLowerCase().replace(/\s+/g, '-')}.png` });
+      link.click();
+      URL.revokeObjectURL(url);
+    });
   }
 
   private showOverlay(title: string, ...body: HTMLElement[]): void {
