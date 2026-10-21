@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import { TILE_COUNT } from '../sim/grid';
 import type { PlanTile } from '../sim/sim';
 
-export type PreviewTint = 'build' | 'remove';
+export type PreviewTint = 'build' | 'remove' | 'ring';
 
 const CHANGE = new THREE.Color('#ffffff');
 const KEEP = new THREE.Color('#ffffff');
 const REMOVE = new THREE.Color('#c4453a');
 const BLOCKED = new THREE.Color('#c4453a');
+const RING = new THREE.Color('#f6eedc');
 
 /** Translucent tile highlights for the build preview, coloured per tile. */
 export class CursorLayer {
@@ -36,13 +37,15 @@ export class CursorLayer {
       this.matrix.makeTranslation(x + 0.5, 0.08, y + 0.5);
       this.object.setMatrixAt(n, this.matrix);
       const color =
-        status === 'blocked'
-          ? BLOCKED
-          : tint === 'remove'
-            ? REMOVE
-            : status === 'keep'
-              ? KEEP
-              : CHANGE;
+        tint === 'ring'
+          ? RING
+          : status === 'blocked'
+            ? BLOCKED
+            : tint === 'remove'
+              ? REMOVE
+              : status === 'keep'
+                ? KEEP
+                : CHANGE;
       this.object.setColorAt(n, color);
       n++;
     }

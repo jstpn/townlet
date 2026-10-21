@@ -152,3 +152,31 @@ describe('zone and building tools', () => {
     expect(h.sim.state.buildingId[idx(11, 11)]).toBeGreaterThan(0);
   });
 });
+
+describe('selection and results', () => {
+  it('selects the clicked tile when no tool is active', () => {
+    const h = harness();
+    h.hoverAt({ x: 4, y: 4 });
+    h.press();
+    h.release();
+    expect(h.tool.selected).toEqual({ x: 4, y: 4 });
+    h.tool.setTool({ kind: 'road' });
+    expect(h.tool.selected).toBeUndefined();
+  });
+
+  it('reports the outcome of each gesture', () => {
+    const h = harness();
+    const results: unknown[] = [];
+    h.tool.onCommand = (r) => results.push(r);
+    h.tool.setTool({ kind: 'road' });
+    h.hoverAt({ x: 4, y: 4 });
+    h.press();
+    h.release();
+    h.press();
+    h.release();
+    expect(results).toEqual([
+      { ok: true, cost: 10 },
+      { ok: false, reason: 'nothing-to-build' },
+    ]);
+  });
+});

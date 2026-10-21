@@ -33,7 +33,12 @@ describe('monthly budget', () => {
     sim.step();
     expect(sim.state.day).toBe(30);
     expect(sim.state.money).toBe(money - 10);
-    expect(sim.state.budget).toEqual({ income: 0, expenses: 10 });
+    expect(sim.state.budget).toEqual({
+      income: 0,
+      expenses: 10,
+      taxes: { 1: 0, 2: 0, 3: 0 },
+      upkeep: { park: 5, road: 5 },
+    });
   });
 
   it('taxes developed lots by level, occupancy and rate', () => {
@@ -43,6 +48,7 @@ describe('monthly budget', () => {
     sim.setTaxRate(20);
     days(sim, 30);
     expect(sim.state.budget.income).toBeCloseTo((15 + 3) * 2);
+    expect(sim.state.budget.taxes).toEqual({ 1: 30, 2: 6, 3: 0 });
   });
 
   it('scales upkeep by difficulty', () => {
@@ -104,6 +110,14 @@ describe('ending the game', () => {
     sim.step();
     expect(sim.state.day).toBe(2);
     expect(sim.takeEvents()).not.toContainEqual({ kind: 'won' });
+  });
+});
+
+describe('before founding', () => {
+  it('does not advance the calendar', () => {
+    const sim = new Sim({ seed: 'test', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
+    sim.step();
+    expect(sim.state.day).toBe(0);
   });
 });
 

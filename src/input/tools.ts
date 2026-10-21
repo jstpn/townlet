@@ -2,7 +2,7 @@ import type { CameraRig } from '../render/camera';
 import type { PreviewTint } from '../render/cursor';
 import type { BuildingKind } from '../sim/catalogue';
 import type { Point } from '../sim/grid';
-import type { Plan, Sim } from '../sim/sim';
+import type { CommandResult, Plan, Sim } from '../sim/sim';
 import type { ZoneKind } from '../sim/types';
 import type { Pointer } from './pointer';
 
@@ -24,6 +24,11 @@ export class BuildTool {
   preview: Preview | undefined;
   /** Bumped whenever `preview` changes, so the renderer can skip unchanged frames. */
   previewRev = 0;
+  /** Tile clicked with no tool active, for the info panel. */
+  selected: Point | undefined;
+  selectionRev = 0;
+  /** Called with the outcome of every committed gesture. */
+  onCommand: ((result: CommandResult) => void) | undefined;
   private start: Point | undefined;
   private hover: Point | undefined;
 
@@ -40,7 +45,14 @@ export class BuildTool {
   setTool(tool: Tool): void {
     this.tool = tool;
     this.start = undefined;
+    this.select(undefined);
     this.refreshPreview();
+  }
+
+  select(tile: Point | undefined): void {
+    if (tile?.x === this.selected?.x && tile?.y === this.selected?.y) return;
+    this.selected = tile;
+    this.selectionRev++;
   }
 
   /** Re-picks the tile under the pointer. Called on pointer moves and once per frame, since the camera can move too. */
@@ -67,22 +79,24 @@ export class BuildTool {
   }
 
   private commit(from: Point, to: Point): void {
+    let result: CommandResult;
     switch (this.tool.kind) {
       case 'road':
-        this.sim.placeRoadLine(from.x, from.y, to.x, to.y);
+        result = this.sim.placeRoadLine(from.x, from.y, to.x, to.y);
         break;
       case 'bulldoze':
-        this.sim.bulldozeRect(from.x, from.y, to.x, to.y);
+        result = this.sim.bulldozeRect(from.x, from.y, to.x, to.y);
         break;
       case 'zone':
-        this.sim.zoneRect(this.tool.zone, from.x, from.y, to.x, to.y);
+        result = this.sim.zoneRect(this.tool.zone, from.x, from.y, to.x, to.y);
         break;
       case 'building':
-        this.sim.placeBuilding(this.tool.building, to.x, to.y);
+        result = this.sim.placeBuilding(this.tool.building, to.x, to.y);
         break;
       case 'none':
-        break;
+        return;
     }
+    this.onCommand?.(result);
   }
 
   private refreshPreview(): void {
@@ -95,8 +109,12 @@ export class BuildTool {
   }
 
   private readonly onPointerDown = (button: number): void => {
-    if (button !== 0 || this.tool.kind === 'none') return;
+    if (button !== 0) return;
     this.hover = this.rig.pickTile(this.pointer.ndc);
+    if (this.tool.kind === 'none') {
+      this.select(this.hover);
+      return;
+    }
     this.start = this.hover;
     this.refreshPreview();
   };

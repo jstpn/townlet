@@ -13,8 +13,7 @@ import { TerrainLayer } from './render/terrain';
 import { WaterLayer } from './render/water';
 import { ZoneLayer } from './render/zones';
 import type { Difficulty } from './sim/difficulty';
-import { Sim } from './sim/sim';
-import { Zone } from './sim/types';
+import { type PlanTile, Sim } from './sim/sim';
 
 const DAY_SECONDS = 0.5;
 
@@ -29,6 +28,7 @@ export class Game {
   readonly sim: Sim;
   readonly gfx: GameRenderer;
   readonly tool: BuildTool;
+  paletteName: PaletteName;
   private palette: Palette;
   private readonly layers: Layer[] = [
     new WaterLayer(),
@@ -38,6 +38,7 @@ export class Game {
     new BuildingLayer(),
   ];
   private readonly cursor = new CursorLayer();
+  private readonly ring = new CursorLayer();
   private readonly pointer: Pointer;
   private readonly controls: CameraControls;
   private readonly clock = new THREE.Clock();
@@ -46,27 +47,22 @@ export class Game {
   private dayClock = 0;
   private readonly unbindKeys: () => void;
   private previewRev = -1;
+  /** Called after each frame's simulation and before the render, for the HUD. */
+  onFrame: (() => void) | undefined;
 
   constructor(canvas: HTMLCanvasElement, options: GameOptions) {
+    this.paletteName = options.palette;
     this.palette = PALETTES[options.palette];
     this.sim = new Sim({ seed: options.seed, difficulty: options.difficulty });
     this.gfx = new GameRenderer(canvas, this.palette);
     for (const layer of this.layers) this.gfx.scene.add(layer.object);
-    this.gfx.scene.add(this.cursor.object);
+    this.gfx.scene.add(this.cursor.object, this.ring.object);
     this.pointer = new Pointer(canvas);
     this.controls = new CameraControls(this.gfx.rig, this.pointer, canvas);
     this.tool = new BuildTool(this.sim, this.gfx.rig, this.pointer);
     this.unbindKeys = bindKeys({
       q: () => this.gfx.rig.rotate(-1),
       e: () => this.gfx.rig.rotate(1),
-      '1': () => this.tool.setTool({ kind: 'road' }),
-      '2': () => this.tool.setTool({ kind: 'zone', zone: Zone.Residential }),
-      '3': () => this.tool.setTool({ kind: 'zone', zone: Zone.Commercial }),
-      '4': () => this.tool.setTool({ kind: 'zone', zone: Zone.Industrial }),
-      t: () => this.tool.setTool({ kind: 'building', building: 'townHall' }),
-      p: () => this.tool.setTool({ kind: 'building', building: 'park' }),
-      b: () => this.tool.setTool({ kind: 'bulldoze' }),
-      escape: () => this.tool.setTool({ kind: 'none' }),
       ' ': () => (this.speed = this.speed === 0 ? 1 : 0),
     });
     this.gfx.renderer.setAnimationLoop(this.frame);
@@ -81,7 +77,14 @@ export class Game {
     };
   }
 
+  /** Soft highlight under the info panel's selection, or a building's reach. */
+  highlight(tiles: readonly PlanTile[] | undefined): void {
+    if (tiles) this.ring.show(tiles, 'ring');
+    else this.ring.clear();
+  }
+
   setPalette(name: PaletteName): void {
+    this.paletteName = name;
     this.palette = PALETTES[name];
     this.gfx.setPalette(this.palette);
   }
@@ -99,6 +102,7 @@ export class Game {
     this.gfx.rig.update(dt);
     this.tool.update();
     this.tick(dt);
+    this.onFrame?.();
     this.syncLayers();
     this.gfx.render();
   };

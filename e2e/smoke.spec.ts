@@ -5,6 +5,8 @@ test('boots, lays a road by dragging across land, and renders without errors', a
   page.on('pageerror', (err) => errors.push(err.message));
   await page.goto('/?seed=budapest');
   await expect(page.locator('#scene')).toBeVisible();
+  await page.getByRole('button', { name: 'Found the town' }).click();
+  await page.waitForFunction(() => window.townlet !== undefined);
   await page.waitForTimeout(400);
 
   // Find a run of five grass tiles near the middle of the map and its screen position.

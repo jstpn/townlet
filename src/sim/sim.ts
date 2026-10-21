@@ -9,7 +9,7 @@ import { DIFFICULTY, type Difficulty } from './difficulty';
 import { type Budget, computeHappiness, settleMonth } from './economy';
 import { type Coverage, computeCoverage, computePollution, computeRoadAccess } from './fields';
 import { TILE_COUNT, idx, inBounds, lineTiles, rectTiles, snapToAxis, xOf, yOf } from './grid';
-import { type Demand, computeDemand, stepGrowth } from './growth';
+import { type Demand, type Fields, computeDemand, stepGrowth } from './growth';
 import { generateMap } from './mapgen';
 import { type Rng, createRng } from './rng';
 import { Terrain, Zone, type ZoneKind } from './types';
@@ -130,7 +130,7 @@ export class Sim {
       demand: { residential: 0, commercial: 0, industrial: 0 },
       happiness: 100,
       taxRate: 10,
-      budget: { income: 0, expenses: 0 },
+      budget: { income: 0, expenses: 0, taxes: { 1: 0, 2: 0, 3: 0 }, upkeep: {} },
       status: 'playing',
       announced: new Set(),
       rev: { terrain: 0, roads: 0, zones: 0, buildings: 0 },
@@ -140,15 +140,11 @@ export class Sim {
   /** Advances one game day: demand, happiness, growth on every lot, and the budget on month days. */
   step(): void {
     const s = this.state;
-    if (s.status === 'lost') return;
+    if (s.status === 'lost' || s.townHallId === undefined) return;
     const settings = DIFFICULTY[s.difficulty];
     s.day++;
     Object.assign(s, computeDemand(s));
-    const fields = {
-      coverage: this.coverage(),
-      roadAccess: this.roadAccess(),
-      pollution: this.pollution(),
-    };
+    const fields = this.fields();
     s.happiness = computeHappiness(s, fields);
     if (stepGrowth(s, fields, this.rng, settings)) s.rev.zones++;
     if (s.day % DAYS_PER_MONTH === 0) {
@@ -182,6 +178,11 @@ export class Sim {
     this.state.announced.add(key);
     this.events.push(event);
     return true;
+  }
+
+  /** The derived grids growth and the info panel read, each cached on its revision counter. */
+  fields(): Fields {
+    return { coverage: this.coverage(), roadAccess: this.roadAccess(), pollution: this.pollution() };
   }
 
   coverage(): Coverage {
