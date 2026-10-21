@@ -204,7 +204,7 @@ function raiseHills(terrain: Uint8Array, noise: Noise2D): Uint8Array {
     return out;
   };
   for (let tile = 0; tile < TILE_COUNT; tile++) {
-    if (height[tile] === 0) continue;
+    if (terrain[tile] !== Terrain.Grass && terrain[tile] !== Terrain.Forest) continue;
     const highest = around(tile, Math.max);
     const lowest = around(tile, Math.min);
     if (height[tile] > highest) height[tile] = highest;

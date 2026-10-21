@@ -26,7 +26,9 @@ export class Sound {
 
   constructor() {
     this.muted = readMuted();
+    // A touch counts as a gesture only once it lifts, so both ends of a press are listened to.
     window.addEventListener('pointerdown', this.wake);
+    window.addEventListener('pointerup', this.wake);
     window.addEventListener('keydown', this.wake);
   }
 
@@ -42,7 +44,7 @@ export class Sound {
     if (!a) return;
     if (this.muted) {
       a.master.gain.setTargetAtTime(0, a.ctx.currentTime, 0.05);
-      setTimeout(() => void (this.muted && a.ctx.suspend()), 300);
+      setTimeout(() => void (this.muted && this.audio === a && a.ctx.suspend()), 300);
     } else {
       a.master.gain.setTargetAtTime(MASTER, a.ctx.currentTime, 0.05);
       void a.ctx.resume();
@@ -101,6 +103,7 @@ export class Sound {
 
   dispose(): void {
     window.removeEventListener('pointerdown', this.wake);
+    window.removeEventListener('pointerup', this.wake);
     window.removeEventListener('keydown', this.wake);
     void this.audio?.ctx.close();
     this.audio = undefined;

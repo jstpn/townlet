@@ -30,6 +30,7 @@ export class CameraRig {
   private readonly terrace = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private readonly raycaster = new THREE.Raycaster();
   private readonly ndc = new THREE.Vector2();
+  private readonly hit = new THREE.Vector3();
 
   constructor() {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 400);
@@ -125,12 +126,11 @@ export class CameraRig {
   /** The map tile under a normalised device coordinate, if any: the highest terrace the ray meets first. */
   pickTile(ndc: THREE.Vector2Like, height: Uint8Array): Point | undefined {
     this.raycaster.setFromCamera(this.ndc.set(ndc.x, ndc.y), this.camera);
-    const hit = new THREE.Vector3();
     for (let level = TOP_LEVEL; level >= 0; level--) {
       this.terrace.constant = -level * STEP_Y;
-      if (!this.raycaster.ray.intersectPlane(this.terrace, hit)) continue;
-      const x = Math.floor(hit.x);
-      const y = Math.floor(hit.z);
+      if (!this.raycaster.ray.intersectPlane(this.terrace, this.hit)) continue;
+      const x = Math.floor(this.hit.x);
+      const y = Math.floor(this.hit.z);
       if (inBounds(x, y) && height[idx(x, y)] === level) return { x, y };
     }
     return undefined;

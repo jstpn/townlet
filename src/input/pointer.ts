@@ -47,7 +47,7 @@ export class Pointer {
     this.moveHandlers.push(handler);
   }
 
-  /** A gesture in progress has been taken over by a second finger. */
+  /** A gesture in progress has been taken over by a second finger, or cancelled by the browser. */
   onCancel(handler: () => void): void {
     this.cancelHandlers.push(handler);
   }
@@ -88,11 +88,14 @@ export class Pointer {
     for (const h of this.moveHandlers) h();
   };
 
+  /** A lift finishes the gesture; a cancel (the browser or system took the pointer) drops it instead. */
   private readonly handleUp = (e: PointerEvent): void => {
     const touch = e.pointerType === 'touch';
     if (touch) this.touches.delete(e.pointerId);
     if (this.multi) {
       if (this.touches.size === 0) this.multi = false;
+    } else if (e.type === 'pointercancel') {
+      for (const h of this.cancelHandlers) h();
     } else if (e.button <= 2) {
       for (const h of this.upHandlers) h(e.button as PointerButton);
     }
