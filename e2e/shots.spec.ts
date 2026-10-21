@@ -3,7 +3,7 @@ import { CYCLE_DAYS, MIDNIGHT } from '../src/render/daylight';
 import { SAVE_KEY, type SaveFile } from '../src/save';
 import { snapshot } from '../src/sim/save';
 import { autoplay } from '../tests/autoplayer';
-import { boot } from './boot';
+import { enter } from './boot';
 
 /** README pictures: a grown town in every palette, by day and night. Run with `npm run shots`. */
 test('takes the README screenshots @shots', async ({ page }) => {
@@ -24,7 +24,7 @@ test('takes the README screenshots @shots', async ({ page }) => {
     page.screenshot({ path: `docs/screenshots/${name}.jpg`, type: 'jpeg', quality: 84 });
   await page.goto('/');
   await shot('start');
-  await boot(page, '', 'Continue');
+  await enter(page, 'Continue');
   await page.evaluate(() => {
     window.townlet.speed = 0;
   });

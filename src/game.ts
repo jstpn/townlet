@@ -24,6 +24,8 @@ import { Sim } from './sim/sim';
 const DAY_SECONDS = 0.5;
 /** Zoom the postcard fit measures at; the answer scales linearly from here. */
 const FIT_ZOOM = 10;
+/** Height the postcard fit allows for: the tallest roofs and the turbine tips. */
+const ROOF_HEIGHT = 2.5;
 
 export type GameOptions = {
   seed: string;
@@ -157,7 +159,8 @@ export class Game {
     const rig = this.gfx.rig;
     const pose = { x: (x0 + x1) / 2, z: (y0 + y1) / 2, zoom: FIT_ZOOM, rotation: 0 };
     rig.setPose(pose);
-    // Orthographic screen extent scales with 1 / zoom, so one measurement gives the fitting zoom.
+    // Orthographic screen extent scales with 1 / zoom, so measuring the box's corners at ground
+    // and roof height once gives the fitting zoom, plus a little margin.
     let extent = 0;
     for (const [x, z] of [
       [x0, y0],
@@ -165,11 +168,12 @@ export class Game {
       [x0, y1],
       [x1, y1],
     ]) {
-      const ndc = rig.project(x, z);
-      extent = Math.max(extent, Math.abs(ndc.x), Math.abs(ndc.y));
+      for (const y of [0, ROOF_HEIGHT]) {
+        const ndc = rig.project(x, z, y);
+        extent = Math.max(extent, Math.abs(ndc.x), Math.abs(ndc.y));
+      }
     }
-    // A little margin, plus room for the tallest roofs and the title card.
-    return { ...pose, zoom: FIT_ZOOM * extent * 1.1 + 2 };
+    return { ...pose, zoom: FIT_ZOOM * extent * 1.15 };
   }
 
   dispose(): void {
@@ -240,8 +244,10 @@ function drawTitleCard(
   const cardH = 150 * scale;
   const x = pad;
   const y = height - pad - cardH;
-  ctx.fillStyle = 'rgba(28, 24, 20, 0.12)';
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = token('--ink');
   ctx.fillRect(x + 6 * scale, y + 8 * scale, cardW, cardH);
+  ctx.globalAlpha = 1;
   ctx.fillStyle = token('--paper');
   ctx.fillRect(x, y, cardW, cardH);
   ctx.fillStyle = token('--accent');

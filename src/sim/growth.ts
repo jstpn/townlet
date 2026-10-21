@@ -12,7 +12,6 @@ export type Fields = { coverage: Coverage; roadAccess: Uint8Array; pollution: Fl
 
 const clamp1 = (v: number): number => clamp(v, -1, 1);
 
-/** Residents, jobs and the three demand bars, from what the lots currently hold. */
 /** Share of residents who work. */
 const WORKER_SHARE = 0.4;
 /**
@@ -24,6 +23,7 @@ const JOBS_PER_WORKER = 4 / 3;
 /** Of the wanted jobs, the share that is commercial; the rest is industrial. */
 const COMMERCIAL_SHARE = 5 / 8;
 
+/** Residents, jobs and the three demand bars, from what the lots currently hold. */
 export function computeDemand(state: SimState): {
   population: number;
   jobs: number;

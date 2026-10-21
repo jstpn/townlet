@@ -113,9 +113,9 @@ export class CameraRig {
     return this.raycaster.ray.intersectPlane(this.groundPlane, hit) ?? undefined;
   }
 
-  /** Screen position (normalised device coordinates) of a ground point. */
-  project(x: number, z: number): { x: number; y: number } {
-    const v = new THREE.Vector3(x, 0, z).project(this.camera);
+  /** Screen position (normalised device coordinates) of a world point, on the ground by default. */
+  project(x: number, z: number, y = 0): { x: number; y: number } {
+    const v = new THREE.Vector3(x, y, z).project(this.camera);
     return { x: v.x, y: v.y };
   }
 

@@ -79,13 +79,16 @@ const CATEGORIES: Category[] = [
     label: 'Services',
     items: [
       TOWN_HALL,
-      ...(['windTurbine', 'waterTower', 'school', 'clinic', 'fireStation', 'policeStation'] as const).map(
-        building,
-      ),
+      ...(
+        ['windTurbine', 'waterTower', 'school', 'clinic', 'fireStation', 'policeStation'] as const
+      ).map(building),
     ],
   },
   { label: 'Decor', items: (['park', 'plaza', 'tree'] as const).map(building) },
-  { label: 'Bulldoze', items: [{ label: 'Bulldoze', cost: BULLDOZE_COST, tool: { kind: 'bulldoze' } }] },
+  {
+    label: 'Bulldoze',
+    items: [{ label: 'Bulldoze', cost: BULLDOZE_COST, tool: { kind: 'bulldoze' } }],
+  },
 ];
 
 export type HudCallbacks = { onNewTown: () => void };
@@ -109,7 +112,13 @@ export class Hud {
   private readonly overlay = el('div.overlay');
   private readonly hints = el('div.hints');
   private category = -1;
-  private shown = { day: -1, money: NaN, speed: -1, selected: undefined as unknown, budget: undefined as Budget | undefined };
+  private shown = {
+    day: -1,
+    money: NaN,
+    speed: -1,
+    selected: undefined as unknown,
+    budget: undefined as Budget | undefined,
+  };
   private paused = false;
   private pausedSpeed = 1;
   private hint = 0;
@@ -228,7 +237,12 @@ export class Hud {
     const bar = el('nav.menu');
     CATEGORIES.forEach((cat, i) => {
       this.categoryButtons.push(
-        el('button.category', { onclick: () => this.openCategory(i) }, el('kbd', {}, `${i + 1}`), cat.label),
+        el(
+          'button.category',
+          { onclick: () => this.openCategory(i) },
+          el('kbd', {}, `${i + 1}`),
+          cat.label,
+        ),
       );
       const buttons = cat.items.map((item): [MenuItem, HTMLElement] => {
         const cost = this.game.sim.price(item.cost);
@@ -428,7 +442,11 @@ export class Hud {
     this.game.speed = 0;
     this.showOverlay(
       'The town is bankrupt',
-      el('p', {}, `${formatDate(s.day)}. ${num(s.population)} residents, ${num(-s.money)} in debt.`),
+      el(
+        'p',
+        {},
+        `${formatDate(s.day)}. ${num(s.population)} residents, ${num(-s.money)} in debt.`,
+      ),
       el('button.primary', { onclick: () => this.callbacks.onNewTown() }, 'New town'),
     );
   }
@@ -475,9 +493,15 @@ export class Hud {
     card.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
-      const link = el<HTMLAnchorElement>('a', { href: url, download: `${name.toLowerCase().replace(/\s+/g, '-')}.png` });
+      const link = el<HTMLAnchorElement>('a', {
+        href: url,
+        download: `${name.toLowerCase().replace(/\s+/g, '-')}.png`,
+      });
+      // Some browsers only honour the download when the link is in the document and the URL is still live.
+      document.body.append(link);
       link.click();
-      URL.revokeObjectURL(url);
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   }
 
@@ -498,7 +522,11 @@ export class Hud {
         {},
         el('h3', {}, hint[0]),
         el('p', {}, hint[1]),
-        el('button.ghost', { onclick: () => (this.hint++, this.showHint()) }, last ? 'Got it' : 'Next'),
+        el(
+          'button.ghost',
+          { onclick: () => (this.hint++, this.showHint()) },
+          last ? 'Got it' : 'Next',
+        ),
       ),
     );
   }

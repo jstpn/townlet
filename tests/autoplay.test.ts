@@ -21,6 +21,7 @@ describe('a sensible mayor', () => {
         `${difficulty} ${seed}: won ${wonAt}, lost ${lostAt}, pop ${sim.state.population}, money ${Math.round(sim.state.money)}`,
       );
       const [min, max] = BOUND[difficulty];
+      // A loss leaves wonAt undefined, which the bounds catch too; this just names it in the failure.
       expect(lostAt).toBeUndefined();
       expect(wonAt).toBeGreaterThan(min);
       expect(wonAt).toBeLessThanOrEqual(max);
