@@ -1,24 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { Difficulty } from '../src/sim/difficulty';
 import { Sim } from '../src/sim/sim';
-import { Terrain } from '../src/sim/types';
-import { days, flatTerrain } from './helpers';
+import { days, foundedSim } from './helpers';
 
-function camp(difficulty: Difficulty = 'normal', found = true): Sim {
-  const sim = new Sim({
-    seed: 'test',
-    difficulty,
-    terrain: flatTerrain(Terrain.Grass),
-    age: 'forager',
-  });
-  if (found) sim.placeBuilding('camp', 30, 30);
+/** A founded forager camp at (30, 30) with its stores full. */
+function camp(difficulty: Difficulty = 'normal'): Sim {
+  const sim = foundedSim({ age: 'forager', difficulty });
   sim.state.stock = { food: 60, wood: 40, stone: 40 };
   return sim;
 }
 
 describe('advancements', () => {
   it('offers Fire once the camp stands', () => {
-    const unfounded = camp('normal', false);
+    const unfounded = new Sim({ seed: 'test', difficulty: 'normal', age: 'forager' });
+    unfounded.state.stock.wood = 40;
     expect(unfounded.startResearch('fire')).toEqual({ ok: false, reason: 'locked' });
     const sim = camp();
     expect(sim.startResearch('fire')).toEqual({ ok: true, cost: 0 });
@@ -80,12 +75,7 @@ describe('advancements', () => {
   });
 
   it("keeps another age's advancements out of reach", () => {
-    const motor = new Sim({
-      seed: 'test',
-      difficulty: 'normal',
-      terrain: flatTerrain(Terrain.Grass),
-    });
-    motor.placeBuilding('townHall', 30, 30);
+    const motor = foundedSim();
     expect(motor.startResearch('fire')).toEqual({ ok: false, reason: 'locked' });
   });
 });

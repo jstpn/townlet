@@ -5,7 +5,17 @@ import {
   researchError,
   stepResearch,
 } from './advancements';
-import { AGE_DEFS, type Age, RESOURCES, type Stock, computeCaps, scaleStock } from './ages';
+import {
+  AGE_DEFS,
+  type Age,
+  type Stock,
+  affords,
+  computeCaps,
+  isMain,
+  priceStock,
+  scaleStock,
+  spend,
+} from './ages';
 import {
   BUILDINGS,
   BULLDOZE_COST,
@@ -290,9 +300,7 @@ export class Sim {
     const s = this.state;
     const error = researchError(s, id);
     if (error) return { ok: false, reason: error };
-    const cost = researchCost(s, id);
-    for (const [r, amount] of Object.entries(cost) as [keyof Stock, number][])
-      s.stock[r] = (s.stock[r] ?? 0) - amount;
+    spend(s.stock, researchCost(s, id));
     s.research = { id, daysLeft: researchDays(s) };
     s.rev.save++;
     return { ok: true, cost: 0 };
@@ -435,7 +443,7 @@ export class Sim {
     if (planned.some((t) => s.height[idx(t.x, t.y)] !== s.height[idx(x, y)]))
       return { tiles: planned, cost, error: 'uneven' };
     if (kind !== age.main && !s.founded) return { tiles: planned, cost, error: 'needs-town-hall' };
-    const materials = scaleStock(def.materials ?? {}, DIFFICULTY[s.difficulty].costMultiplier);
+    const materials = priceStock(def.materials ?? {}, s.difficulty);
     return this.priced(planned, cost, materials);
   }
 
@@ -443,7 +451,7 @@ export class Sim {
     const plan = this.planBuilding(kind, x, y);
     if (plan.error) return { ok: false, reason: plan.error };
     const id = this.state.nextBuildingId++;
-    const main = kind === AGE_DEFS[this.state.age].main;
+    const main = isMain(this.state, kind);
     this.state.buildings.set(id, { id, kind, x, y, workers: 0, wasted: 0 });
     if (main) this.state.founded = true;
     const result = this.execute(plan, (tile) => {
@@ -473,7 +481,7 @@ export class Sim {
     };
     for (const tile of rectTiles(x0, y0, x1, y1)) {
       const building = s.buildingId[tile] === -1 ? undefined : s.buildings.get(s.buildingId[tile]);
-      if (building?.kind === AGE_DEFS[s.age].main) plan(tile, 'blocked');
+      if (building && isMain(s, building.kind)) plan(tile, 'blocked');
       else if (building) for (const t of footprint(building)) plan(t, 'change');
       else if (
         s.road[tile] === 1 ||
@@ -522,8 +530,9 @@ export class Sim {
   private priced(tiles: PlanTile[], cost: number, materials?: Stock): Plan {
     if (cost > 0 && cost > this.state.money) return { tiles, cost, error: 'insufficient-funds' };
     if (!materials) return { tiles, cost };
-    const short = RESOURCES.some((r) => (materials[r] ?? 0) > (this.state.stock[r] ?? 0));
-    return short ? { tiles, cost, materials, error: 'short' } : { tiles, cost, materials };
+    return affords(this.state.stock, materials)
+      ? { tiles, cost, materials }
+      : { tiles, cost, materials, error: 'short' };
   }
 
   /** Shared validation for tile-painting plans: needs a town hall, something to change, and funds. */
@@ -540,10 +549,7 @@ export class Sim {
   private execute(plan: Plan, apply: (tile: number) => void): CommandResult {
     if (plan.error) return { ok: false, reason: plan.error };
     this.state.money -= plan.cost;
-    for (const r of RESOURCES) {
-      const amount = plan.materials?.[r];
-      if (amount) this.state.stock[r] = (this.state.stock[r] ?? 0) - amount;
-    }
+    if (plan.materials) spend(this.state.stock, plan.materials);
     for (const t of plan.tiles) {
       if (t.status === 'change' && inBounds(t.x, t.y)) apply(idx(t.x, t.y));
     }

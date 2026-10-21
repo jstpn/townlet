@@ -1,4 +1,4 @@
-import { type Age, RESOURCES, type Stock, scaleStock } from './ages';
+import { type Age, type Stock, affords, priceStock } from './ages';
 import type { BuildingKind } from './catalogue';
 import { DIFFICULTY } from './difficulty';
 import type { CommandError, SimState } from './sim';
@@ -16,8 +16,7 @@ export type AdvancementDef = {
   cost: Stock;
 };
 
-export const ADVANCEMENT_IDS = ['fire', 'grindingStones'] as const;
-export type AdvancementId = (typeof ADVANCEMENT_IDS)[number];
+export type AdvancementId = 'fire' | 'grindingStones';
 
 export const ADVANCEMENTS: Record<AdvancementId, AdvancementDef> = {
   fire: { label: 'Fire', age: 'forager', needs: [], standing: 'camp', cost: { wood: 10 } },
@@ -32,7 +31,7 @@ export const ADVANCEMENTS: Record<AdvancementId, AdvancementDef> = {
 
 /** The advancement's price at this difficulty. */
 export const researchCost = (state: SimState, id: AdvancementId): Stock =>
-  scaleStock(ADVANCEMENTS[id].cost, DIFFICULTY[state.difficulty].costMultiplier);
+  priceStock(ADVANCEMENTS[id].cost, state.difficulty);
 
 /** Why research on `id` cannot start now, or undefined when it can. */
 export function researchError(state: SimState, id: AdvancementId): CommandError | undefined {
@@ -42,9 +41,7 @@ export function researchError(state: SimState, id: AdvancementId): CommandError 
   if (def.age !== state.age || !standing || def.needs.some((n) => !state.held.has(n)))
     return 'locked';
   if (state.research) return 'busy';
-  const cost = researchCost(state, id);
-  if (RESOURCES.some((r) => (cost[r] ?? 0) > (state.stock[r] ?? 0))) return 'short';
-  return undefined;
+  return affords(state.stock, researchCost(state, id)) ? undefined : 'short';
 }
 
 /** Days a research takes at this difficulty. */

@@ -1,19 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Difficulty } from '../src/sim/difficulty';
 import { idx } from '../src/sim/grid';
-import { type Building, Sim } from '../src/sim/sim';
+import type { Building, Sim } from '../src/sim/sim';
 import { Terrain } from '../src/sim/types';
-import { days, flatTerrain } from './helpers';
+import { days, foundedSim } from './helpers';
 
 /** A founded forager camp (6 beds) at (30, 30) on flat grass, with the food stock given. */
 function camp(food: number, difficulty: Difficulty = 'normal'): Sim {
-  const sim = new Sim({
-    seed: 'test',
-    difficulty,
-    terrain: flatTerrain(Terrain.Grass),
-    age: 'forager',
-  });
-  sim.placeBuilding('camp', 30, 30);
+  const sim = foundedSim({ age: 'forager', difficulty });
   sim.state.stock.food = food;
   return sim;
 }

@@ -16,10 +16,11 @@ export type DifficultySettings = {
   leaveThreshold: number;
   /** Days between departures while the town is hungry or unhappy. */
   leaveDays: number;
-  /** Whether the town is lost when its last resident leaves. */
-  canLose: boolean;
   fireChance: number;
-  /** Money below this ends the game. Undefined means the town cannot fail. */
+  /**
+   * Money below this ends the game. Undefined means the town cannot fail: no debt limit, and the
+   * last resident leaving does not lose it either.
+   */
   debtLimit: number | undefined;
   winTarget: number;
 };
@@ -36,7 +37,6 @@ export const DIFFICULTY: Record<Difficulty, DifficultySettings> = {
     arrivalDays: 2,
     leaveThreshold: 30,
     leaveDays: 6,
-    canLose: false,
     fireChance: 0,
     debtLimit: undefined,
     winTarget: 2000,
@@ -52,7 +52,6 @@ export const DIFFICULTY: Record<Difficulty, DifficultySettings> = {
     arrivalDays: 3,
     leaveThreshold: 40,
     leaveDays: 4,
-    canLose: true,
     fireChance: 0.15,
     debtLimit: -5000,
     winTarget: 5000,
@@ -68,7 +67,6 @@ export const DIFFICULTY: Record<Difficulty, DifficultySettings> = {
     arrivalDays: 4,
     leaveThreshold: 50,
     leaveDays: 3,
-    canLose: true,
     fireChance: 0.5,
     debtLimit: -2000,
     winTarget: 10000,

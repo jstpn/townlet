@@ -1,4 +1,5 @@
 import { BUILDINGS, type BuildingKind } from './catalogue';
+import { DIFFICULTY, type Difficulty } from './difficulty';
 import type { SimState } from './sim';
 
 /** The ages built so far, earliest first. Each build step adds the next (tasks/spec.md section 17). */
@@ -11,10 +12,7 @@ export type Resource = (typeof RESOURCES)[number];
 export type Stock = Partial<Record<Resource, number>>;
 
 export type AgeDef = {
-  label: string;
-  /** Resources kept and shown in this age, at most five. Coin is `money`, outside the stock. */
-  resources: readonly Resource[];
-  /** Caps the main building gives before any storage. */
+  /** Caps the main building gives before any storage. Coin is `money`, outside the stock. */
   caps: Stock;
   /** Placed first; founds the town. */
   main: BuildingKind;
@@ -27,8 +25,6 @@ export type AgeDef = {
 
 export const AGE_DEFS: Record<Age, AgeDef> = {
   forager: {
-    label: 'Forager camp',
-    resources: ['food', 'wood', 'stone'],
     caps: { food: 60, wood: 40, stone: 40 },
     main: 'camp',
     buildings: ['camp', 'tent', 'gatheringHut', 'woodcutter', 'dryingRack'],
@@ -36,8 +32,6 @@ export const AGE_DEFS: Record<Age, AgeDef> = {
     zones: false,
   },
   motor: {
-    label: 'Motor city',
-    resources: [],
     caps: {},
     main: 'townHall',
     buildings: [
@@ -66,6 +60,23 @@ export function scaleStock(stock: Stock, by: number): Stock {
   }
   return out;
 }
+
+/** A base price in materials at the difficulty's cost multiplier. */
+export const priceStock = (base: Stock, difficulty: Difficulty): Stock =>
+  scaleStock(base, DIFFICULTY[difficulty].costMultiplier);
+
+/** Whether `stock` holds at least `price` of every resource. */
+export const affords = (stock: Stock, price: Stock): boolean =>
+  RESOURCES.every((r) => (price[r] ?? 0) <= (stock[r] ?? 0));
+
+/** Takes `price` out of `stock`. */
+export function spend(stock: Stock, price: Stock): void {
+  for (const r of RESOURCES) if (price[r]) stock[r] = (stock[r] ?? 0) - (price[r] ?? 0);
+}
+
+/** Whether `kind` is the age's main building: it founds the town, works without a path and stays. */
+export const isMain = (state: SimState, kind: BuildingKind): boolean =>
+  kind === AGE_DEFS[state.age].main;
 
 /** The age's base caps plus the caps of every standing building. */
 export function computeCaps(state: SimState): Stock {

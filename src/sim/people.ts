@@ -1,4 +1,4 @@
-import { AGE_DEFS, type Stock } from './ages';
+import { type Stock, isMain } from './ages';
 import { BUILDINGS, footprint } from './catalogue';
 import type { DifficultySettings } from './difficulty';
 import type { Building, SimState } from './sim';
@@ -10,16 +10,7 @@ const HUNGER_PENALTY = 10;
 
 /** The main building always works; anything else only within two tiles of a path. */
 function works(state: SimState, b: Building, roadAccess: Uint8Array): boolean {
-  return b.kind === AGE_DEFS[state.age].main || footprint(b).some((t) => roadAccess[t] === 1);
-}
-
-/** Beds in every working building. */
-export function countBeds(state: SimState, roadAccess: Uint8Array): number {
-  let beds = 0;
-  for (const b of state.buildings.values()) {
-    if (works(state, b, roadAccess)) beds += BUILDINGS[b.kind].beds ?? 0;
-  }
-  return beds;
+  return isMain(state, b.kind) || footprint(b).some((t) => roadAccess[t] === 1);
 }
 
 /** Whether the terrain a workplace draws on lies within its radius. */
@@ -28,26 +19,34 @@ function supplied(state: SimState, b: Building): boolean {
   return !near || footprint(b, near.radius).some((t) => state.terrain[t] === near.terrain);
 }
 
+/** Manhattan distance from a building's corner to the nearest home's. */
+function distance(b: Building, homes: Building[]): number {
+  let nearest = Infinity;
+  for (const h of homes) nearest = Math.min(nearest, Math.abs(h.x - b.x) + Math.abs(h.y - b.y));
+  return nearest;
+}
+
 /**
- * Residents fill the slots of working, supplied workplaces nearest a bed first (Manhattan from
- * corner to corner, ties by id), and each filled slot makes its yield into the stock up to the cap.
+ * Residents fill the slots of working, supplied workplaces nearest a bed first (ties by id), and
+ * each filled slot makes its yield into the stock up to the cap. Returns the beds of the working
+ * buildings.
  */
-function work(state: SimState, roadAccess: Uint8Array, caps: Stock): void {
+function work(state: SimState, roadAccess: Uint8Array, caps: Stock): number {
   const homes: Building[] = [];
-  const open: { b: Building; distance: number }[] = [];
+  const places: Building[] = [];
+  let beds = 0;
   for (const b of state.buildings.values()) {
     b.workers = 0;
     b.wasted = 0;
     if (!works(state, b, roadAccess)) continue;
     const def = BUILDINGS[b.kind];
-    if (def.beds) homes.push(b);
-    if (def.slots && supplied(state, b)) open.push({ b, distance: 0 });
+    if (def.beds) {
+      homes.push(b);
+      beds += def.beds;
+    }
+    if (def.slots && supplied(state, b)) places.push(b);
   }
-  for (const place of open) {
-    place.distance = Math.min(
-      ...homes.map((h) => Math.abs(h.x - place.b.x) + Math.abs(h.y - place.b.y)),
-    );
-  }
+  const open = places.map((b) => ({ b, distance: distance(b, homes) }));
   open.sort((p, q) => p.distance - q.distance || p.b.id - q.b.id);
   let free = state.population;
   for (const { b } of open) {
@@ -62,6 +61,7 @@ function work(state: SimState, roadAccess: Uint8Array, caps: Stock): void {
     state.stock[r] = have + kept;
     b.wasted = made - kept;
   }
+  return beds;
 }
 
 /**
@@ -74,7 +74,7 @@ export function stepPeople(
   caps: Stock,
   settings: DifficultySettings,
 ): boolean {
-  work(state, roadAccess, caps);
+  const beds = work(state, roadAccess, caps);
   const food = state.stock.food ?? 0;
   const eaten = Math.min(food, state.population);
   state.stock.food = food - eaten;
@@ -86,12 +86,12 @@ export function stepPeople(
   if (state.leaveWait >= settings.leaveDays) {
     state.leaveWait = 0;
     state.population--;
-    if (state.population === 0 && settings.canLose) return true;
+    if (state.population === 0 && settings.debtLimit !== undefined) return true;
   }
 
   const welcome =
     !unhappy &&
-    state.population < countBeds(state, roadAccess) &&
+    state.population < beds &&
     state.stock.food >= ARRIVAL_FOOD_DAYS * (state.population + 1);
   state.arrivalWait = welcome ? state.arrivalWait + 1 : 0;
   if (state.arrivalWait >= settings.arrivalDays) {
