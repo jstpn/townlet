@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { MAP_SIZE, inBounds, mod, type Point } from '../sim/grid';
+import { MAP_SIZE, idx, inBounds, mod, type Point } from '../sim/grid';
+import { STEP_Y } from './ground';
 
 const PITCH = THREE.MathUtils.degToRad(35.264);
 const DISTANCE = 140;
@@ -23,8 +24,11 @@ export class CameraRig {
   private yawTarget = Math.PI / 4;
   /** Extra yaw while the user is dragging to rotate. */
   dragYaw = 0;
+  /** Terrace levels, so picking lands on the terrace under the pointer rather than the sea level. */
+  ground: Uint8Array | undefined;
   private aspect = 1;
   private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private readonly terrace = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private readonly raycaster = new THREE.Raycaster();
   private readonly ndc = new THREE.Vector2();
 
@@ -119,13 +123,18 @@ export class CameraRig {
     return { x: v.x, y: v.y };
   }
 
-  /** The map tile under a normalised device coordinate, if any. */
+  /** The map tile under a normalised device coordinate, if any: the highest terrace the ray meets first. */
   pickTile(ndc: THREE.Vector2Like): Point | undefined {
-    const point = this.groundPoint(ndc);
-    if (!point) return undefined;
-    const x = Math.floor(point.x);
-    const y = Math.floor(point.z);
-    return inBounds(x, y) ? { x, y } : undefined;
+    this.raycaster.setFromCamera(this.ndc.set(ndc.x, ndc.y), this.camera);
+    const hit = new THREE.Vector3();
+    for (let level = 2; level >= 0; level--) {
+      this.terrace.constant = -level * STEP_Y;
+      if (!this.raycaster.ray.intersectPlane(this.terrace, hit)) continue;
+      const x = Math.floor(hit.x);
+      const y = Math.floor(hit.z);
+      if (inBounds(x, y) && (this.ground?.[idx(x, y)] ?? 0) === level) return { x, y };
+    }
+    return undefined;
   }
 
   update(dt: number): void {

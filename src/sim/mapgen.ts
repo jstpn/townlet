@@ -17,6 +17,8 @@ export type WaterFeature = 'river' | 'lake';
 
 export type GeneratedMap = {
   terrain: Uint8Array;
+  /** Terrace level per tile, 0 to 2. */
+  height: Uint8Array;
   feature: WaterFeature;
 };
 
@@ -73,7 +75,9 @@ function generateVariant(seed: string, variant: number): GeneratedMap {
   else digLake(terrain, rng);
   ringWithSand(terrain);
   plantForest(terrain, forestNoise);
-  return { terrain, feature };
+  // Drawn last from the generator, so maps keep the shape they had before hills existed.
+  const height = raiseHills(terrain, createNoise2D(rng.next));
+  return { terrain, height, feature };
 }
 
 /** Majority filter over the 8-neighbourhood, so coasts lose single-tile specks. */
@@ -170,6 +174,50 @@ function plantForest(terrain: Uint8Array, noise: Noise2D): void {
       if (fbm(noise, x * scale, y * scale) > 0.18) terrain[i] = Terrain.Forest;
     }
   }
+}
+
+/**
+ * Broad terraces from a third noise layer, on grass and forest only: the beach stays low. Lone
+ * bumps and dips are levelled, then every step down is limited to one level so roads can ramp.
+ */
+function raiseHills(terrain: Uint8Array, noise: Noise2D): Uint8Array {
+  const height = new Uint8Array(TILE_COUNT);
+  const scale = 1 / 14;
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      const tile = idx(x, y);
+      if (terrain[tile] !== Terrain.Grass && terrain[tile] !== Terrain.Forest) continue;
+      const n = fbm(noise, x * scale, y * scale);
+      height[tile] = n > 0.38 ? 2 : n > 0.12 ? 1 : 0;
+    }
+  }
+  const around = (tile: number, pick: (a: number, b: number) => number): number => {
+    let out = -1;
+    for (const [dx, dy] of DIRS4) {
+      const nx = xOf(tile) + dx;
+      const ny = yOf(tile) + dy;
+      if (inBounds(nx, ny)) out = out < 0 ? height[idx(nx, ny)] : pick(out, height[idx(nx, ny)]);
+    }
+    return out;
+  };
+  for (let tile = 0; tile < TILE_COUNT; tile++) {
+    if (height[tile] === 0) continue;
+    const highest = around(tile, Math.max);
+    const lowest = around(tile, Math.min);
+    if (height[tile] > highest) height[tile] = highest;
+    else if (height[tile] < lowest) height[tile] = lowest;
+  }
+  for (let changed = true; changed;) {
+    changed = false;
+    for (let tile = 0; tile < TILE_COUNT; tile++) {
+      const floor = around(tile, Math.min) + 1;
+      if (height[tile] > floor) {
+        height[tile] = floor;
+        changed = true;
+      }
+    }
+  }
+  return height;
 }
 
 /** Share of tiles that are not water. */

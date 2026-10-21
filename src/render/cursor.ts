@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { TILE_COUNT } from '../sim/grid';
+import { TILE_COUNT, idx } from '../sim/grid';
 import type { Point } from '../sim/grid';
+import { groundY } from './ground';
 import type { PlanStatus } from '../sim/sim';
 import { uploadInstances } from './instanced';
 
@@ -13,6 +14,8 @@ const RING = new THREE.Color('#f6eedc');
 /** Translucent tile highlights for the build preview, coloured per tile. */
 export class CursorLayer {
   readonly object: THREE.InstancedMesh;
+  /** Terrace levels, so the highlight sits on the ground it marks. */
+  ground: Uint8Array | undefined;
   private readonly matrix = new THREE.Matrix4();
 
   constructor() {
@@ -34,7 +37,8 @@ export class CursorLayer {
     let n = 0;
     for (const { x, y, status } of tiles) {
       if (status === 'keep' && tint === 'remove') continue;
-      this.matrix.makeTranslation(x + 0.5, 0.08, y + 0.5);
+      const base = this.ground ? groundY(this.ground, idx(x, y)) : 0;
+      this.matrix.makeTranslation(x + 0.5, base + 0.08, y + 0.5);
       this.object.setMatrixAt(n, this.matrix);
       const color =
         tint === 'ring' ? RING : status === 'blocked' || tint === 'remove' ? RED : WHITE;

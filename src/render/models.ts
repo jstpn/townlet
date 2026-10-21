@@ -40,19 +40,96 @@ class ModelBuilder {
   }
 
   /** Two-slope roof over a rectangle, ridge along x when `alongX`, with a small overhang. */
-  gable(role: Role, x0: number, z0: number, x1: number, z1: number, y0: number, y1: number, alongX = true): this {
+  gable(
+    role: Role,
+    x0: number,
+    z0: number,
+    x1: number,
+    z1: number,
+    y0: number,
+    y1: number,
+    alongX = true,
+  ): this {
     const o = 0.05;
     const g = this.g(role);
     if (alongX) {
       const zm = (z0 + z1) / 2;
-      g.quad(x0 - o, y0, z0 - o, x0 - o, y1, zm, x1 + o, y1, zm, x1 + o, y0, z0 - o, 0, 0.7, -0.7, WHITE);
-      g.quad(x1 + o, y0, z1 + o, x1 + o, y1, zm, x0 - o, y1, zm, x0 - o, y0, z1 + o, 0, 0.7, 0.7, WHITE);
+      g.quad(
+        x0 - o,
+        y0,
+        z0 - o,
+        x0 - o,
+        y1,
+        zm,
+        x1 + o,
+        y1,
+        zm,
+        x1 + o,
+        y0,
+        z0 - o,
+        0,
+        0.7,
+        -0.7,
+        WHITE,
+      );
+      g.quad(
+        x1 + o,
+        y0,
+        z1 + o,
+        x1 + o,
+        y1,
+        zm,
+        x0 - o,
+        y1,
+        zm,
+        x0 - o,
+        y0,
+        z1 + o,
+        0,
+        0.7,
+        0.7,
+        WHITE,
+      );
       g.tri(x0, y0, z0, x0, y1, zm, x0, y0, z1, WHITE);
       g.tri(x1, y0, z1, x1, y1, zm, x1, y0, z0, WHITE);
     } else {
       const xm = (x0 + x1) / 2;
-      g.quad(x1 + o, y0, z0 - o, xm, y1, z0 - o, xm, y1, z1 + o, x1 + o, y0, z1 + o, 0.7, 0.7, 0, WHITE);
-      g.quad(x0 - o, y0, z1 + o, xm, y1, z1 + o, xm, y1, z0 - o, x0 - o, y0, z0 - o, -0.7, 0.7, 0, WHITE);
+      g.quad(
+        x1 + o,
+        y0,
+        z0 - o,
+        xm,
+        y1,
+        z0 - o,
+        xm,
+        y1,
+        z1 + o,
+        x1 + o,
+        y0,
+        z1 + o,
+        0.7,
+        0.7,
+        0,
+        WHITE,
+      );
+      g.quad(
+        x0 - o,
+        y0,
+        z1 + o,
+        xm,
+        y1,
+        z1 + o,
+        xm,
+        y1,
+        z0 - o,
+        x0 - o,
+        y0,
+        z0 - o,
+        -0.7,
+        0.7,
+        0,
+        WHITE,
+      );
       g.tri(x0, y0, z0, xm, y1, z0, x1, y0, z0, WHITE);
       g.tri(x1, y0, z1, xm, y1, z1, x0, y0, z1, WHITE);
     }
@@ -168,7 +245,15 @@ class ModelBuilder {
   }
 
   /** Windows on all four sides of a box, `n` per side along x and `m` per side along z. */
-  windowsAround(x0: number, z0: number, x1: number, z1: number, ys: number[], n: number, m: number): this {
+  windowsAround(
+    x0: number,
+    z0: number,
+    x1: number,
+    z1: number,
+    ys: number[],
+    n: number,
+    m: number,
+  ): this {
     this.windowsOn(x0, z1, x1, z1, ys, n);
     this.windowsOn(x1, z0, x0, z0, ys, n);
     this.windowsOn(x1, z1, x1, z0, ys, m);
@@ -298,7 +383,15 @@ export function buildModels() {
     }),
     turbineBlades: define(1, (m) => {
       // One blade up the y axis from the hub; the layer places three per turbine, spinning about z.
-      m.box('trim', -0.025, 0, -0.012, 0.025, 0.52, 0.012).box('trim', -0.05, -0.05, -0.03, 0.05, 0.05, 0.03);
+      m.box('trim', -0.025, 0, -0.012, 0.025, 0.52, 0.012).box(
+        'trim',
+        -0.05,
+        -0.05,
+        -0.03,
+        0.05,
+        0.05,
+        0.03,
+      );
     }),
     waterTower: define(1, (m) => {
       for (const [x, z] of [

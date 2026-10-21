@@ -10,7 +10,17 @@ import { DIFFICULTY, type Difficulty } from './difficulty';
 import { type Budget, computeHappiness, settleMonth } from './economy';
 import { type Coverage, computeCoverage, computePollution, computeRoadAccess } from './fields';
 import { ignite, monthlyFire, stepFire } from './fire';
-import { TILE_COUNT, clamp, idx, inBounds, lineTiles, rectTiles, snapToAxis, xOf, yOf } from './grid';
+import {
+  TILE_COUNT,
+  clamp,
+  idx,
+  inBounds,
+  lineTiles,
+  rectTiles,
+  snapToAxis,
+  xOf,
+  yOf,
+} from './grid';
 import { type Demand, type Fields, computeDemand, stepGrowth } from './growth';
 import { generateMap } from './mapgen';
 import { type Rng, createRng } from './rng';
@@ -21,6 +31,8 @@ export type SimOptions = {
   difficulty: Difficulty;
   /** Override the generated map, for tests. */
   terrain?: Uint8Array;
+  /** Terrace levels to go with `terrain`; flat when left out. */
+  height?: Uint8Array;
   /** Override the starting money, for tests. */
   money?: number;
   /** Resume the random sequence from a save. */
@@ -34,6 +46,7 @@ export type CommandError =
   | 'insufficient-funds'
   | 'nothing-to-build'
   | 'needs-town-hall'
+  | 'uneven'
   | 'already-built'
   | 'protected';
 
@@ -70,6 +83,8 @@ export type SimState = {
   day: number;
   money: number;
   terrain: Uint8Array;
+  /** Terrace level per tile, 0 to 2. Never changes after generation. */
+  height: Uint8Array;
   road: Uint8Array;
   zone: Uint8Array;
   /** Development level of a zoned tile, 0 (empty lot) to 3. */
@@ -103,7 +118,14 @@ export type SimState = {
    * Bumped whenever the matching layer changes, so renderers know what to rebuild. `save` counts
    * the moments worth an autosave: a command, a tax change, a month settled.
    */
-  rev: { terrain: number; roads: number; zones: number; buildings: number; fire: number; save: number };
+  rev: {
+    terrain: number;
+    roads: number;
+    zones: number;
+    buildings: number;
+    fire: number;
+    save: number;
+  };
 };
 
 /** The whole town simulation: state plus the commands that change it. Deterministic, no DOM. */
@@ -120,12 +142,16 @@ export class Sim {
   constructor(options: SimOptions) {
     const settings = DIFFICULTY[options.difficulty];
     this.rng = createRng(options.seed + ':sim', options.rngState);
+    const map = options.terrain
+      ? { terrain: options.terrain, height: new Uint8Array(TILE_COUNT) }
+      : generateMap(options.seed);
     this.state = {
       seed: options.seed,
       difficulty: options.difficulty,
       day: 0,
       money: options.money ?? settings.startingMoney,
-      terrain: options.terrain ?? generateMap(options.seed).terrain,
+      terrain: options.terrain ?? map.terrain,
+      height: options.height ?? map.height,
       road: new Uint8Array(TILE_COUNT),
       zone: new Uint8Array(TILE_COUNT),
       level: new Uint8Array(TILE_COUNT),
@@ -170,12 +196,15 @@ export class Sim {
       s.money += s.budget.income - s.budget.expenses;
       s.rev.save++;
       const started = monthlyFire(s, fields, this.rng, settings);
-      if (started !== undefined) this.events.push({ kind: 'fire', x: xOf(started), y: yOf(started) });
+      if (started !== undefined)
+        this.events.push({ kind: 'fire', x: xOf(started), y: yOf(started) });
     }
     for (const count of POPULATION_MILESTONES) {
-      if (s.population >= count) this.announce(`population:${count}`, { kind: 'population', count });
+      if (s.population >= count)
+        this.announce(`population:${count}`, { kind: 'population', count });
     }
-    if (s.population >= settings.winTarget && this.announce('won', { kind: 'won' })) s.status = 'won';
+    if (s.population >= settings.winTarget && this.announce('won', { kind: 'won' }))
+      s.status = 'won';
     if (settings.debtLimit !== undefined && s.money < settings.debtLimit) {
       s.status = 'lost';
       this.announce('lost', { kind: 'lost' });
@@ -222,7 +251,11 @@ export class Sim {
 
   /** The derived grids growth and the info panel read, each cached on its revision counter. */
   fields(): Fields {
-    return { coverage: this.coverage(), roadAccess: this.roadAccess(), pollution: this.pollution() };
+    return {
+      coverage: this.coverage(),
+      roadAccess: this.roadAccess(),
+      pollution: this.pollution(),
+    };
   }
 
   coverage(): Coverage {
@@ -317,9 +350,14 @@ export class Sim {
       if (!blocked) cost += this.clearingFee(tile);
       return { x: xOf(tile), y: yOf(tile), status: blocked ? 'blocked' : 'change' };
     });
-    if (planned.length < def.size * def.size) return { tiles: planned, cost, error: 'out-of-bounds' };
-    if (planned.some((t) => t.status === 'blocked')) return { tiles: planned, cost, error: 'occupied' };
-    if (kind !== 'townHall' && !s.founded) return { tiles: planned, cost, error: 'needs-town-hall' };
+    if (planned.length < def.size * def.size)
+      return { tiles: planned, cost, error: 'out-of-bounds' };
+    if (planned.some((t) => t.status === 'blocked'))
+      return { tiles: planned, cost, error: 'occupied' };
+    if (planned.some((t) => s.height[idx(t.x, t.y)] !== s.height[idx(x, y)]))
+      return { tiles: planned, cost, error: 'uneven' };
+    if (kind !== 'townHall' && !s.founded)
+      return { tiles: planned, cost, error: 'needs-town-hall' };
     return this.priced(planned, cost);
   }
 
@@ -358,7 +396,11 @@ export class Sim {
       const building = s.buildingId[tile] === -1 ? undefined : s.buildings.get(s.buildingId[tile]);
       if (building?.kind === 'townHall') plan(tile, 'blocked');
       else if (building) for (const t of footprint(building)) plan(t, 'change');
-      else if (s.road[tile] === 1 || s.zone[tile] !== Zone.None || s.terrain[tile] === Terrain.Forest)
+      else if (
+        s.road[tile] === 1 ||
+        s.zone[tile] !== Zone.None ||
+        s.terrain[tile] === Terrain.Forest
+      )
         plan(tile, 'change');
       else plan(tile, 'keep');
     }
@@ -408,7 +450,8 @@ export class Sim {
     if (tiles.length === 0) return { tiles, cost, error: 'out-of-bounds' };
     if (!this.state.founded) return { tiles, cost, error: 'needs-town-hall' };
     if (tiles.every((t) => t.status === 'blocked')) return { tiles, cost, error: allBlocked };
-    if (!tiles.some((t) => t.status === 'change')) return { tiles, cost, error: 'nothing-to-build' };
+    if (!tiles.some((t) => t.status === 'change'))
+      return { tiles, cost, error: 'nothing-to-build' };
     return this.priced(tiles, cost);
   }
 

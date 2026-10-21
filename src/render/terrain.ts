@@ -3,6 +3,7 @@ import { DIRS4, MAP_SIZE, distanceField, idx, inBounds } from '../sim/grid';
 import type { SimState } from '../sim/sim';
 import { Terrain } from '../sim/types';
 import { GeometryBuilder } from './geometryBuilder';
+import { STEP_Y } from './ground';
 import { tileHash } from './hash';
 import type { Layer } from './layer';
 import type { Palette } from './palette';
@@ -11,7 +12,7 @@ import { TreeLayer } from './trees';
 export const SEA_BED_Y = -0.45;
 export const WATER_Y = -0.14;
 
-/** Ground and trees. Rebuilds when the terrain revision or the palette changes. */
+/** Ground as flat terraces with cliff sides, and trees. Rebuilds when the terrain revision or the palette changes. */
 export class TerrainLayer implements Layer {
   readonly object = new THREE.Group();
   private readonly mesh: THREE.Mesh;
@@ -37,14 +38,15 @@ export class TerrainLayer implements Layer {
     // Water never changes after generation, so the depth field is computed once per town.
     this.depth ??= distanceField((tile) => state.terrain[tile] !== Terrain.Water);
     this.mesh.geometry.dispose();
-    this.mesh.geometry = buildTerrainGeometry(state.terrain, this.depth, palette);
-    this.trees.rebuild(state.terrain, palette);
+    this.mesh.geometry = buildTerrainGeometry(state.terrain, state.height, this.depth, palette);
+    this.trees.rebuild(state.terrain, state.height, palette);
     return true;
   }
 }
 
 function buildTerrainGeometry(
   terrain: Uint8Array,
+  height: Uint8Array,
   depth: Uint16Array,
   palette: Palette,
 ): THREE.BufferGeometry {
@@ -75,14 +77,18 @@ function buildTerrainGeometry(
           : kind === Terrain.Forest || tileHash(x, y, 7) < 0.5
             ? grassAlt
             : grass;
-      builder.floor(x, y, x + 1, y + 1, 0, top);
-      // Skirts: a small step down into the water on every shore-facing side.
+      const top_y = height[tile] * STEP_Y;
+      builder.floor(x, y, x + 1, y + 1, top_y, top);
+      // Sides: down to the sea bed on a shore, or down to the lower terrace on a cliff.
       for (const [dx, dy] of DIRS4) {
-        if (!wet(x + dx, y + dy)) continue;
-        if (dx === -1) builder.wall(x, y + 1, x, y, SEA_BED_Y, 0, sandSide);
-        else if (dx === 1) builder.wall(x + 1, y, x + 1, y + 1, SEA_BED_Y, 0, sandSide);
-        else if (dy === -1) builder.wall(x, y, x + 1, y, SEA_BED_Y, 0, sandSide);
-        else builder.wall(x + 1, y + 1, x, y + 1, SEA_BED_Y, 0, sandSide);
+        const nx = x + dx;
+        const ny = y + dy;
+        const bottom = wet(nx, ny) ? SEA_BED_Y : height[idx(nx, ny)] * STEP_Y;
+        if (bottom >= top_y) continue;
+        if (dx === -1) builder.wall(x, y + 1, x, y, bottom, top_y, sandSide);
+        else if (dx === 1) builder.wall(x + 1, y, x + 1, y + 1, bottom, top_y, sandSide);
+        else if (dy === -1) builder.wall(x, y, x + 1, y, bottom, top_y, sandSide);
+        else builder.wall(x + 1, y + 1, x, y + 1, bottom, top_y, sandSide);
       }
     }
   }

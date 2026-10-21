@@ -1,4 +1,5 @@
 import { idx, inBounds } from '../sim/grid';
+import { STEP_Y } from './ground';
 
 export const ROAD_N = 1;
 export const ROAD_E = 2;
@@ -20,4 +21,34 @@ export function roadConnections(road: Uint8Array, x: number, y: number): number 
     if (inBounds(x + dx, y + dy) && road[idx(x + dx, y + dy)] === 1) mask |= bit;
   }
   return mask;
+}
+
+/**
+ * The side a road tile slopes up toward, or 0 when it lies flat: a tile ramps when it joins
+ * exactly one higher neighbour and nothing else but the tile straight behind it.
+ */
+export function rampDirection(road: Uint8Array, height: Uint8Array, x: number, y: number): number {
+  const mask = roadConnections(road, x, y);
+  const h = height[idx(x, y)];
+  let up = 0;
+  for (const [dx, dy, bit] of SIDES) {
+    if (mask & bit && height[idx(x + dx, y + dy)] === h + 1) up = up === 0 ? bit : -1;
+  }
+  if (up <= 0) return 0;
+  const opposite = up << 2 > ROAD_W ? up >> 2 : up << 2;
+  return (mask & ~(up | opposite)) === 0 ? up : 0;
+}
+
+/** Height of the road surface under a world point, following ramps; the terrace height elsewhere. */
+export function roadY(road: Uint8Array, height: Uint8Array, px: number, pz: number): number {
+  const x = Math.floor(px);
+  const z = Math.floor(pz);
+  if (!inBounds(x, z)) return 0;
+  const base = height[idx(x, z)] * STEP_Y;
+  const up = rampDirection(road, height, x, z);
+  if (up === 0) return base;
+  const fx = px - x;
+  const fz = pz - z;
+  const t = up === ROAD_N ? 1 - fz : up === ROAD_S ? fz : up === ROAD_E ? fx : 1 - fx;
+  return base + t * STEP_Y;
 }

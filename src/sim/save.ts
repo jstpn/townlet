@@ -2,6 +2,7 @@ import { type Building, Sim, type SimState } from './sim';
 
 export const SNAPSHOT_GRIDS = [
   'terrain',
+  'height',
   'road',
   'zone',
   'level',
@@ -59,6 +60,7 @@ export function restoreSim(snap: SimSnapshot): Sim {
     seed: snap.seed,
     difficulty: snap.difficulty,
     terrain: Uint8Array.from(snap.terrain),
+    height: Uint8Array.from(snap.height),
     rngState: snap.rng,
   });
   const s = sim.state;

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { xOf, yOf } from '../sim/grid';
 import type { SimState } from '../sim/sim';
 import { GeometryBuilder } from './geometryBuilder';
+import { groundY } from './ground';
 import { tileHash } from './hash';
 import { uploadInstances } from './instanced';
 import type { Layer } from './layer';
@@ -19,6 +20,7 @@ export class FireLayer implements Layer {
   private readonly smoke: THREE.InstancedMesh;
   private readonly smokeMaterial: THREE.MeshStandardMaterial;
   private burning: number[] = [];
+  private height: Uint8Array = new Uint8Array(0);
   private palette: Palette | undefined;
   private rev = -1;
   private time = 0;
@@ -58,6 +60,7 @@ export class FireLayer implements Layer {
     }
     if (state.rev.fire === this.rev) return false;
     this.rev = state.rev.fire;
+    this.height = state.height;
     this.burning = [];
     state.fire.forEach((days, tile) => {
       if (days > 0 && this.burning.length < MAX_FIRES) this.burning.push(tile);
@@ -74,18 +77,29 @@ export class FireLayer implements Layer {
     for (const tile of this.burning) {
       const x = xOf(tile);
       const y = yOf(tile);
+      const base = groundY(this.height, tile);
       for (let i = 0; i < FLAMES_PER_FIRE; i++) {
         const phase = tileHash(x, y, 20 + i) * 6.28;
-        const flicker = 0.75 + 0.25 * Math.sin(this.time * 9 + phase) * Math.cos(this.time * 5.3 + phase);
-        this.p.set(x + 0.25 + 0.5 * tileHash(x, y, 30 + i), 0.4, y + 0.25 + 0.5 * tileHash(x, y, 40 + i));
+        const flicker =
+          0.75 + 0.25 * Math.sin(this.time * 9 + phase) * Math.cos(this.time * 5.3 + phase);
+        this.p.set(
+          x + 0.25 + 0.5 * tileHash(x, y, 30 + i),
+          base + 0.4,
+          y + 0.25 + 0.5 * tileHash(x, y, 40 + i),
+        );
         this.q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, phase + this.time * 0.6);
         this.s.set(1.6 + 0.6 * flicker, 1.2 + 1.8 * flicker, 1.6 + 0.6 * flicker);
         this.flames.setMatrixAt(f++, this.m.compose(this.p, this.q, this.s));
       }
       for (let i = 0; i < PUFFS_PER_FIRE; i++) {
-        const t = ((this.time + tileHash(x, y, 50 + i) * PUFF_SECONDS) % PUFF_SECONDS) / PUFF_SECONDS;
+        const t =
+          ((this.time + tileHash(x, y, 50 + i) * PUFF_SECONDS) % PUFF_SECONDS) / PUFF_SECONDS;
         const drift = tileHash(x, y, 60 + i) - 0.5;
-        this.p.set(x + 0.5 + drift * 0.3 + t * 0.6, 1.6 + t * 2.2, y + 0.5 - drift * 0.2 + t * 0.3);
+        this.p.set(
+          x + 0.5 + drift * 0.3 + t * 0.6,
+          base + 1.6 + t * 2.2,
+          y + 0.5 - drift * 0.2 + t * 0.3,
+        );
         const size = 0.6 + t * 1.8;
         this.s.set(size, size, size);
         this.q.identity();

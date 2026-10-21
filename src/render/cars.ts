@@ -7,6 +7,7 @@ import { GeometryBuilder } from './geometryBuilder';
 import { uploadInstances } from './instanced';
 import type { Layer } from './layer';
 import type { Palette } from './palette';
+import { roadY } from './roadMask';
 
 const MAX_CARS = 150;
 const RESIDENTS_PER_CAR = 4;
@@ -26,6 +27,7 @@ export class CarLayer implements Layer {
   private jobsByNetwork: number[][] = [];
   private network: Int32Array = new Int32Array(0);
   private road: Uint8Array = new Uint8Array(0);
+  private height: Uint8Array = new Uint8Array(0);
   private target = 0;
   private colors: THREE.Color[] = [];
   private palette: Palette | undefined;
@@ -55,6 +57,7 @@ export class CarLayer implements Layer {
     if (rev === this.rev) return false;
     this.rev = rev;
     this.road = state.road;
+    this.height = state.height;
     this.collectEndpoints(state);
     this.cars = this.cars.filter((car) => car.path.every((tile) => state.road[tile] === 1));
     return false;
@@ -125,14 +128,25 @@ export class CarLayer implements Layer {
     const blend = u < 0.25 ? car.path[i - 1] : u > 0.75 ? car.path[i + 2] : undefined;
     if (blend !== undefined) {
       const w = u < 0.25 ? 0.5 - 2 * u : 2 * u - 1.5;
-      const [ox, oz] = u < 0.25 ? [xOf(a) - xOf(blend), yOf(a) - yOf(blend)] : [xOf(blend) - xOf(b), yOf(blend) - yOf(b)];
+      const [ox, oz] =
+        u < 0.25
+          ? [xOf(a) - xOf(blend), yOf(a) - yOf(blend)]
+          : [xOf(blend) - xOf(b), yOf(blend) - yOf(b)];
       dx = dx * (1 - w) + ox * w;
       dz = dz * (1 - w) + oz * w;
       const len = Math.hypot(dx, dz) || 1;
       dx /= len;
       dz /= len;
     }
-    this.p.set(xOf(a) + 0.5 + (xOf(b) - xOf(a)) * u + dz * LANE, 0.06, yOf(a) + 0.5 + (yOf(b) - yOf(a)) * u - dx * LANE);
+    const px = xOf(a) + 0.5 + (xOf(b) - xOf(a)) * u + dz * LANE;
+    const pz = yOf(a) + 0.5 + (yOf(b) - yOf(a)) * u - dx * LANE;
+    // Averaged a little ahead and behind, so a step between terraces at a junction becomes a short slope.
+    const y =
+      (roadY(this.road, this.height, px - dx * 0.3, pz - dz * 0.3) +
+        roadY(this.road, this.height, px, pz) +
+        roadY(this.road, this.height, px + dx * 0.3, pz + dz * 0.3)) /
+      3;
+    this.p.set(px, y + 0.06, pz);
     this.q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, Math.atan2(-dz, dx));
     this.object.setMatrixAt(index, this.m.compose(this.p, this.q, this.s));
     this.object.setColorAt(index, this.colors[car.color]);

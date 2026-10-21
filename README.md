@@ -27,6 +27,9 @@ a small radius, so build outward from it.
   stations raise a lot's appeal, which decides how far it levels up.
 - Everything costs upkeep each month. Taxes come from developed lots. Run out
   of money on normal or hard and the town is lost; easy cannot be lost.
+- The land rises in terraces. Roads ramp up a level at a time, lots sit on
+  whatever terrace they are zoned on, and the two-by-two services need level
+  ground.
 - Fires start on their own on normal and hard, spread to neighbours, and burn
   faster under fire station cover. Bulldozing puts a fire out.
 - The town is won at 2,000 residents on easy, 5,000 on normal and 10,000 on

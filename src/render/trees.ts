@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MAP_SIZE, idx } from '../sim/grid';
 import { Terrain } from '../sim/types';
+import { groundY } from './ground';
 import { tileHash } from './hash';
 import { uploadInstances } from './instanced';
 import type { Palette } from './palette';
@@ -43,7 +44,7 @@ export class TreeLayer {
   }
 
   /** Rebuilds every instance from the terrain. Cheap enough to run whenever a tile changes. */
-  rebuild(terrain: Uint8Array, palette: Palette): void {
+  rebuild(terrain: Uint8Array, height: Uint8Array, palette: Palette): void {
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
     const scale = new THREE.Vector3();
@@ -57,6 +58,7 @@ export class TreeLayer {
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         if (terrain[idx(x, y)] !== Terrain.Forest) continue;
+        const base = groundY(height, idx(x, y));
         const count = 1 + Math.floor(tileHash(x, y, 1) * 3);
         for (let k = 0; k < count && n < CAPACITY; k++) {
           const px = x + 0.2 + tileHash(x, y, 10 + k) * 0.6;
@@ -65,17 +67,17 @@ export class TreeLayer {
           rotation.setFromAxisAngle(up, tileHash(x, y, 40 + k) * Math.PI * 2);
           const crown = tileHash(x, y, 50 + k) < 0.5 ? foliage : foliageAlt;
 
-          position.set(px, 0.16 * s, pz);
+          position.set(px, base + 0.16 * s, pz);
           scale.set(s, s, s);
           matrix.compose(position, rotation, scale);
           this.trunks.setMatrixAt(n, matrix);
 
-          position.set(px, (0.32 + 0.25) * s, pz);
+          position.set(px, base + (0.32 + 0.25) * s, pz);
           matrix.compose(position, rotation, scale);
           this.lower.setMatrixAt(n, matrix);
           this.lower.setColorAt(n, crown);
 
-          position.set(px, (0.32 + 0.5 + 0.12) * s, pz);
+          position.set(px, base + (0.32 + 0.5 + 0.12) * s, pz);
           matrix.compose(position, rotation, scale);
           this.upper.setMatrixAt(n, matrix);
           this.upper.setColorAt(n, crown);

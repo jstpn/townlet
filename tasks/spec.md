@@ -11,7 +11,7 @@ place a few services, watch a town grow. Three numbers matter: money, population
 and happiness. Three difficulty levels change how hard the economy pushes back.
 The look is procedural low-poly 3D in Wes Anderson palettes.
 
-Not in version one: hills, weather, traffic simulation, power lines or pipes,
+Not in version one: weather, traffic simulation, power lines or pipes,
 loans, multiple save slots, touch, audio, accounts, any backend.
 
 ## 2. Stack

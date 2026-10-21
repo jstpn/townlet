@@ -3,6 +3,7 @@ import { BUILDINGS, type BuildingKind } from '../sim/catalogue';
 import { MAP_SIZE, idx, inBounds } from '../sim/grid';
 import type { SimState } from '../sim/sim';
 import { Zone } from '../sim/types';
+import { groundY } from './ground';
 import { tileHash } from './hash';
 import { uploadInstances } from './instanced';
 import type { Layer } from './layer';
@@ -132,14 +133,23 @@ export class BuildingLayer implements Layer {
         const models = ZONE_MODELS[state.zone[tile]];
         if (!models || level === 0) continue;
         const key = models[level - 1] ?? models[0];
-        this.place(key, x, y, 1, this.facing(state, x, y, 1), tileHash(x, y, 3));
+        this.place(
+          key,
+          x,
+          y,
+          groundY(state.height, tile),
+          1,
+          this.facing(state, x, y, 1),
+          tileHash(x, y, 3),
+        );
       }
     }
     for (const b of state.buildings.values()) {
       const size = BUILDINGS[b.kind].size;
       const key = SERVICE_MODELS[b.kind];
       const yaw = this.facing(state, b.x, b.y, size);
-      const placed = this.place(key, b.x, b.y, size, yaw, tileHash(b.x, b.y, 5));
+      const base = groundY(state.height, idx(b.x, b.y));
+      const placed = this.place(key, b.x, b.y, base, size, yaw, tileHash(b.x, b.y, 5));
       if (placed && b.kind === 'windTurbine') this.turbines.push(this.m.clone());
     }
     for (const [key, parts] of this.meshes) {
@@ -182,11 +192,12 @@ export class BuildingLayer implements Layer {
     return Math.atan2(dx, dy);
   }
 
-  /** Writes one instance of `key` at tile (x, y), leaving its matrix in `this.m`. False when full. */
+  /** Writes one instance of `key` at tile (x, y) and ground height `base`, leaving its matrix in `this.m`. False when full. */
   private place(
     key: ModelKey,
     x: number,
     y: number,
+    base: number,
     size: number,
     yaw: number,
     variant: number,
@@ -197,7 +208,7 @@ export class BuildingLayer implements Layer {
     if (!parts || !this.colors || i >= (this.capacity.get(key) ?? 0)) return false;
     this.counts.set(key, i + 1);
     const half = size / 2;
-    this.m.makeTranslation(x + half, 0, y + half);
+    this.m.makeTranslation(x + half, base, y + half);
     this.m2.makeRotationY(yaw);
     this.m.multiply(this.m2);
     this.m2.makeTranslation(-half, 0, -half);

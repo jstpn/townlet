@@ -48,6 +48,7 @@ const ERROR_TEXT: Record<CommandError, string> = {
   'insufficient-funds': 'The town cannot afford that.',
   'nothing-to-build': 'Nothing to do there.',
   'needs-town-hall': 'Found the town first: place the town hall.',
+  uneven: 'Services need level ground.',
   'already-built': 'A town has only one town hall.',
   protected: 'The town hall stays.',
 };

@@ -11,6 +11,7 @@ import { CYCLE_DAYS, daylight } from './render/daylight';
 import { FireLayer } from './render/fire';
 import type { Layer } from './render/layer';
 import { type CameraPose, ZOOM_MAX } from './render/camera';
+import { groundY } from './render/ground';
 import { PALETTES, type Palette, type PaletteName } from './render/palette';
 import { GameRenderer } from './render/renderer';
 import { RoadLayer } from './render/roads';
@@ -19,7 +20,7 @@ import { WaterLayer } from './render/water';
 import { ZoneLayer } from './render/zones';
 import type { Difficulty } from './sim/difficulty';
 import { type SaveFile, clearSave, writeSave } from './save';
-import { MAP_SIZE, TILE_COUNT, type Point, xOf, yOf } from './sim/grid';
+import { MAP_SIZE, TILE_COUNT, type Point, idx, xOf, yOf } from './sim/grid';
 import { restoreSim, snapshot } from './sim/save';
 import { Sim } from './sim/sim';
 
@@ -74,6 +75,7 @@ export class Game {
         : new Sim({ seed: start.seed, difficulty: start.difficulty });
     this.gfx = new GameRenderer(canvas, this.palette);
     if ('sim' in start) this.gfx.rig.setPose(start.camera);
+    this.gfx.rig.ground = this.cursor.ground = this.ring.ground = this.sim.state.height;
     for (const layer of this.layers) this.gfx.scene.add(layer.object);
     this.gfx.scene.add(this.cursor.object, this.ring.object);
     this.pointer = new Pointer(canvas);
@@ -84,7 +86,7 @@ export class Game {
 
   /** Client pixel position of a tile's centre, for tests and labels. */
   tileToScreen(x: number, y: number): { x: number; y: number } {
-    const ndc = this.gfx.rig.project(x + 0.5, y + 0.5);
+    const ndc = this.gfx.rig.project(x + 0.5, y + 0.5, groundY(this.sim.state.height, idx(x, y)));
     return {
       x: ((ndc.x + 1) / 2) * this.gfx.canvas.clientWidth,
       y: ((1 - ndc.y) / 2) * this.gfx.canvas.clientHeight,

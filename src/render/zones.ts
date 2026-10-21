@@ -3,6 +3,7 @@ import { MAP_SIZE, idx } from '../sim/grid';
 import type { SimState } from '../sim/sim';
 import { Zone } from '../sim/types';
 import { GeometryBuilder } from './geometryBuilder';
+import { groundY } from './ground';
 import type { Layer } from './layer';
 import type { Palette } from './palette';
 
@@ -43,7 +44,8 @@ function buildZoneGeometry(state: SimState, palette: Palette): THREE.BufferGeome
       if (zone === Zone.None || state.level[tile] > 0) continue;
       const color = colors[zone - 1];
       if (!color) continue;
-      builder.floor(x + INSET, y + INSET, x + 1 - INSET, y + 1 - INSET, LOT_Y, color);
+      const base = groundY(state.height, tile) + LOT_Y;
+      builder.floor(x + INSET, y + INSET, x + 1 - INSET, y + 1 - INSET, base, color);
     }
   }
   return builder.build();
