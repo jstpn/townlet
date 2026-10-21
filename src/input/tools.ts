@@ -39,6 +39,10 @@ export class BuildTool {
     pointer.onDown(this.onPointerDown);
     pointer.onMove(this.update);
     pointer.onUp(this.onPointerUp);
+    pointer.onCancel(() => {
+      this.start = undefined;
+      this.refreshPreview();
+    });
   }
 
   setTool(tool: Tool): void {

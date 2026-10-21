@@ -15,6 +15,7 @@ function harness() {
     down: [] as ((b: number) => void)[],
     move: [] as (() => void)[],
     up: [] as ((b: number) => void)[],
+    cancel: [] as (() => void)[],
   };
   const pointer = {
     inside: true,
@@ -22,6 +23,7 @@ function harness() {
     onDown: (h: (b: number) => void) => handlers.down.push(h),
     onMove: (h: () => void) => handlers.move.push(h),
     onUp: (h: (b: number) => void) => handlers.up.push(h),
+    onCancel: (h: () => void) => handlers.cancel.push(h),
   } as unknown as Pointer;
   const rig = { pickTile: () => under } as unknown as CameraRig;
   const tool = new BuildTool(sim, rig, pointer);

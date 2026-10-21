@@ -244,6 +244,20 @@ export class Hud {
       el('div.spacer'),
       this.stats.date,
       el('div.speeds', {}, ...this.speedButtons),
+      el(
+        'div.turns',
+        {},
+        el(
+          'button.ghost',
+          { title: 'Turn left (Q)', onclick: () => this.game.gfx.rig.rotate(-1) },
+          '\u21ba',
+        ),
+        el(
+          'button.ghost',
+          { title: 'Turn right (E)', onclick: () => this.game.gfx.rig.rotate(1) },
+          '\u21bb',
+        ),
+      ),
       el('button.ghost', { onclick: () => this.toggleBudget() }, 'Budget'),
       el('button.ghost', { onclick: () => (this.paused ? this.resume() : this.pause()) }, 'Menu'),
     );

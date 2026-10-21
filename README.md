@@ -52,6 +52,8 @@ offers Continue when a save exists.
 | Space                              | Pause and resume                                                 |
 | Escape                             | Put the tool down, or open the menu                              |
 | M                                  | Sound on or off                                                  |
+| One finger                         | Build, or tap to inspect                                         |
+| Two fingers                        | Pinch to zoom, drag to pan, twist to rotate                      |
 
 The menu holds the palette swatches, the postcard button, which saves a PNG of
 the town from its best angle, the sound toggle, and a way to start a new town.

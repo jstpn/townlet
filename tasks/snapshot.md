@@ -1,44 +1,47 @@
-# Snapshot: townlet (2026-10-21 11:12)
+# Snapshot: townlet (2026-10-21 12:12)
 
 ## Goal
-Build Townlet (Wes Anderson-palette city builder) from tasks/spec.md end to end, all 16 build steps plus the stretch list, autonomously, committing per feature on dev.
+Finish the spec's stretch list (boats and birds, hills, audio, touch) autonomously on `dev`, with review rounds every 3 to 4 code commits, then a final report with screenshots and a reminder to run `mattpocock-skills:retro`.
 
 ## State
-- Branch: dev. Last commit: 47aa5c3 feat: balance pass with a headless autoplayer
-- Uncommitted: README.md, docs/screenshots/*.jpg (6 shots), e2e/shots.spec.ts, package.json (e2e/shots scripts), tasks/todo.md (step 15 ticked). Check and e2e both green on this tree; just needs a commit.
+- Branch: dev. Last commit: 70387b0 feat: synthesised audio
+- Uncommitted: touch controls (src/input/controls.ts, pointer.ts, tools.ts, src/style.css, src/ui/hud.ts, tests/tools.test.ts, e2e/touch.spec.ts). `npm run check` 111 passed, `npm run e2e` 4 passed (touch spec included) at the moment of the snapshot.
 
 ## Done
-- Steps 10 to 15: fire, cars, autosave/continue, simplify + code review round C, post-processing/day-night/postcard, balance pass with autoplayer, README with screenshots.
+- Review round D (simplify + code review, both committed and findings re-reported).
+- Boats and birds, hills with terraces, synthesised audio: each committed and pushed.
+- Touch: two-finger pinch/drag/twist in CameraControls, second finger cancels build gesture via Pointer.onCancel, rotate buttons in the top bar, compact layout under 760px, touch-action none on the canvas, e2e test via CDP touch events.
 
 ## In progress
-- Step 15 commit: `git add -A && git commit -m "docs: README with screenshots"` (with the Co-Authored-By trailer), push dev. Hero shot was verified as daylight before compaction only for the first (png) run; the jpg rerun used day 720, so eyeball docs/screenshots/hero.jpg once before committing.
+- Touch commit. Phone screenshots were taken to the scratchpad (mobile-hints.jpg, mobile-menu.jpg, mobile-pause.jpg) but never viewed; view them, fix any layout overflow, then commit `feat: touch controls`, tick "Touch controls" in tasks/todo.md, add a README controls row for touch gestures, push.
 
 ## Next
-1. Commit and push step 15.
-2. Review round D (simplify with 4 agents, then `/code-review high 561074a..HEAD`), fix, commit as `chore:`.
-3. Stretch, in order: boats and birds, hills with terraces, synthesised audio, touch controls. Tick tasks/todo.md as each lands.
-4. Final report with screenshots; remind Joe to run `mattpocock-skills:retro`.
+1. Commit and push touch (see above).
+2. Review round E over bf778db..HEAD (boats, hills, audio, touch): 4 simplify agents, apply, then `/code-review high <range>`, fix, re-report findings with outcomes, `chore:` commits, push.
+3. Regenerate README shots (`npm run shots`) only if visuals changed; revert byte churn otherwise.
+4. Final report with screenshots (SendUserFile of docs/screenshots and a summary), update the app task list, call wrap_up, and remind Joe to run `mattpocock-skills:retro`.
 
 ## Decisions
-- Demand rebalance (workers 0.4, C target pop/3 + 0.1, I target pop/5 + 0.15): the spec's 0.6 workers stalled every town near 300 residents. Spec updated.
-- Growth rates halved (0.05/0.035/0.025): autoplayer wins easy ~11, normal ~29, hard ~95 months; test bounds 40/80/160.
-- Autosave trigger is `state.rev.save` (bumped in execute, setTaxRate, month settle), polled once per frame; replaced a BuildTool counter and a month check that saved every step before founding.
-- Layer.animate runs on wall-clock while paused, on purpose.
-- Light cycle starts at phase 0.25 so a new town opens in daylight; night is day % 120 in roughly 66 to 90.
+- Hills noise is drawn last from the generator rng so every seed's terrain is byte-identical to before (hash test in tests/hills.test.ts); heights are saved in the snapshot, so pre-hills autosaves are rejected (accepted, local play).
+- Light cycle phase 0 is full day (keys rotated), no START_PHASE; MIDNIGHT = 0.65 exported for the shots spec.
+- Bloom pass disabled by day (`bloom.enabled = night > 0`); verified hero shot unchanged.
+- Skipped merging the grade pass with OutputPass (colour-space include risk for little gain).
+- Boats scaled 1.4x; a boat may sail inside a large lagoon, which was judged charming, not a bug.
 
 ## Gotchas
-- InstancedMesh with vertexColors plus instanceColor rendered black; cars use instance colour only.
-- Shadow map autoUpdate is false, so moving meshes must not castShadow.
-- e2e/screenshots is gitignored; README images live in docs/screenshots as jpg (png were 2 MB each).
-- Residential lots with no service coverage have appeal 0.3 < 0.35 and never grow; the autoplayer must buy services for zoned (not just developed) homes.
-- Vitest console.log from passing tests needs `--silent=false` to show.
+- Roads need a founded town: e2e tests that lay roads must place the town hall first.
+- Playwright tests with `isMobile` + CDP `Input.dispatchTouchEvent` work; `touchEnd` with empty touchPoints lifts all fingers.
+- Prettier is not part of `npm run check`; run `npx prettier --write` on new files before committing.
+- Keep screenshot regeneration out of commits unless visuals changed (`git checkout docs/screenshots`).
 
 ## Key files
-- tests/autoplayer.ts: headless mayor used by tests/autoplay.test.ts and e2e/shots.spec.ts
-- src/render/instanced.ts: shared uploadInstances (sets visible = count > 0)
-- src/render/grade.ts, src/render/daylight.ts: post pass and light curve
-- src/save.ts, src/sim/save.ts: autosave file and sim snapshot
+- src/render/ground.ts, roadMask.ts (rampDirection, roadY), terrain.ts: terraces and ramps.
+- src/audio/sound.ts: all synthesised audio; wired in hud.ts (EVENT_CUE, onCommand) and game.ts.
+- src/input/pointer.ts, controls.ts: touch tracking and pinch.
+- tests/autoplayer.ts, tests/autoplay.test.ts: balance bounds easy 0..40, normal 0..80, hard 40..160 months.
+- e2e/boot.ts: shared boot/enter helpers; e2e/shots.spec.ts regenerates docs/screenshots.
 
 ## Verify
-- `npm run check`: lint clean, 105 tests pass
-- `npm run e2e`: 3 passed; `npm run shots` regenerates docs/screenshots
+- `npm run check`: lint, typecheck, 111 tests pass.
+- `npm run e2e`: 4 passed (smoke x3, touch).
+- `npm run shots`: 1 passed, writes docs/screenshots/*.jpg.

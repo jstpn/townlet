@@ -4,10 +4,16 @@ import type { Pointer } from './pointer';
 const PAN_SPEED = 1.1; // screen heights per second
 const EDGE = 14; // px
 
-/** Camera movement: held keys, edge pan, wheel zoom, middle-drag pan, right-drag rotate. */
+type Pinch = { distance: number; angle: number; x: number; y: number };
+
+/**
+ * Camera movement: held keys, edge pan, wheel zoom, middle-drag pan, right-drag rotate, and on
+ * touch screens two fingers to pinch, drag and twist.
+ */
 export class CameraControls {
   private readonly held = new Set<string>();
   private drag: { button: 1 | 2; lastX: number; lastY: number } | undefined;
+  private pinch: Pinch | undefined;
 
   constructor(
     private readonly rig: CameraRig,
@@ -31,6 +37,10 @@ export class CameraControls {
   }
 
   update(dt: number): void {
+    if (this.pinch && this.pointer.touches.size < 2) {
+      this.pinch = undefined;
+      this.rig.commitDrag();
+    }
     let right = 0;
     let up = 0;
     if (this.held.has('a') || this.held.has('arrowleft')) right -= 1;
@@ -61,6 +71,7 @@ export class CameraControls {
   };
 
   private readonly onPointerMove = (): void => {
+    if (this.pointer.touches.size >= 2) return this.onPinch();
     if (!this.drag) return;
     const dx = this.pointer.x - this.drag.lastX;
     const dy = this.pointer.y - this.drag.lastY;
@@ -73,6 +84,27 @@ export class CameraControls {
       this.rig.pan((-dx / h) * 2, (dy / h) * 2);
     }
   };
+
+  /** Two fingers: their midpoint pans, their distance zooms and their angle rotates. */
+  private onPinch(): void {
+    const [a, b] = [...this.pointer.touches.values()];
+    const next: Pinch = {
+      distance: Math.hypot(b.x - a.x, b.y - a.y) || 1,
+      angle: Math.atan2(b.y - a.y, b.x - a.x),
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2,
+    };
+    if (this.pinch) {
+      const h = this.element.clientHeight;
+      this.rig.zoomBy(this.pinch.distance / next.distance, this.pointer.ndc);
+      this.rig.pan((-(next.x - this.pinch.x) / h) * 2, ((next.y - this.pinch.y) / h) * 2);
+      let twist = next.angle - this.pinch.angle;
+      if (twist > Math.PI) twist -= 2 * Math.PI;
+      if (twist < -Math.PI) twist += 2 * Math.PI;
+      this.rig.dragYaw += twist;
+    }
+    this.pinch = next;
+  }
 
   private readonly onPointerUp = (button: number): void => {
     if (this.drag?.button !== button) return;

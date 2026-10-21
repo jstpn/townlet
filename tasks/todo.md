@@ -29,7 +29,7 @@ Spec: tasks/spec.md. Tick as you go. Review rounds after every 3 or 4 code commi
 - [x] Boats and birds
 - [x] Hills with terraces
 - [x] Synthesised audio
-- [ ] Touch controls
+- [x] Touch controls
 
 ## Notes
 
