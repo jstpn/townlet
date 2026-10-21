@@ -46,7 +46,7 @@ Steps, one commit each, failure modes written as red tests first:
       rounded) or goes up with 3 wood; a forager path costs anything. Check: `npm run check`.
       The snapshot gains the age and stock here, so `SAVE_VERSION` goes to 3 now and stays at 3
       through step 5, since nothing between is released.
-- [ ] 2. `feat: residents arrive for beds and food, eat and leave` (`src/sim/people.ts`,
+- [x] 2. `feat: residents arrive for beds and food, eat and leave` (`src/sim/people.ts`,
       `tests/people.test.ts`). Fails if: nobody arrives at a camp with food in stock; anyone
       arrives faster than `arrivalDays`, past the beds, or with food for under ten days;
       residents do not eat one food a day; an empty food stock does not send one away every

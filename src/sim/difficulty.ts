@@ -9,7 +9,13 @@ export type DifficultySettings = {
   costMultiplier: number;
   upkeepMultiplier: number;
   growthRate: number;
+  /** Days between arrivals while a bed and food wait. */
+  arrivalDays: number;
   leaveThreshold: number;
+  /** Days between departures while the town is hungry or unhappy. */
+  leaveDays: number;
+  /** Whether the town is lost when its last resident leaves. */
+  canLose: boolean;
   fireChance: number;
   /** Money below this ends the game. Undefined means the town cannot fail. */
   debtLimit: number | undefined;
@@ -24,7 +30,10 @@ export const DIFFICULTY: Record<Difficulty, DifficultySettings> = {
     costMultiplier: 0.8,
     upkeepMultiplier: 0.8,
     growthRate: 0.05,
+    arrivalDays: 2,
     leaveThreshold: 30,
+    leaveDays: 6,
+    canLose: false,
     fireChance: 0,
     debtLimit: undefined,
     winTarget: 2000,
@@ -36,7 +45,10 @@ export const DIFFICULTY: Record<Difficulty, DifficultySettings> = {
     costMultiplier: 1,
     upkeepMultiplier: 1,
     growthRate: 0.035,
+    arrivalDays: 3,
     leaveThreshold: 40,
+    leaveDays: 4,
+    canLose: true,
     fireChance: 0.15,
     debtLimit: -5000,
     winTarget: 5000,
@@ -48,7 +60,10 @@ export const DIFFICULTY: Record<Difficulty, DifficultySettings> = {
     costMultiplier: 1.25,
     upkeepMultiplier: 1.3,
     growthRate: 0.025,
+    arrivalDays: 4,
     leaveThreshold: 50,
+    leaveDays: 3,
+    canLose: true,
     fireChance: 0.5,
     debtLimit: -2000,
     winTarget: 10000,

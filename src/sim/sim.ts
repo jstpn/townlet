@@ -7,7 +7,7 @@ import {
   type BuildingKind,
   footprint,
 } from './catalogue';
-import { DIFFICULTY, type Difficulty } from './difficulty';
+import { DIFFICULTY, type Difficulty, type DifficultySettings } from './difficulty';
 import { type Budget, computeHappiness, settleMonth } from './economy';
 import { type Coverage, computeCoverage, computePollution, computeRoadAccess } from './fields';
 import { ignite, monthlyFire, stepFire } from './fire';
@@ -24,6 +24,7 @@ import {
 } from './grid';
 import { type Demand, type Fields, computeDemand, stepGrowth } from './growth';
 import { generateMap } from './mapgen';
+import { stepPeople } from './people';
 import { type Rng, createRng } from './rng';
 import { Terrain, Zone, type ZoneKind } from './types';
 
@@ -108,7 +109,12 @@ export type SimState = {
   blightDays: Uint8Array;
   /** Days of burning left on each tile; 0 is not burning. */
   fire: Uint8Array;
+  /** Residents. Counted from the lots in the Motor city, kept by the people engine before it. */
   population: number;
+  /** Days toward the next arrival, consecutive days of hunger, days toward the next departure. */
+  arrivalWait: number;
+  hungerDays: number;
+  leaveWait: number;
   jobs: number;
   demand: Demand;
   /** 0 to 100. Computed daily; lots empty out below the difficulty's leave threshold. */
@@ -174,6 +180,9 @@ export class Sim {
       blightDays: new Uint8Array(TILE_COUNT),
       fire: new Uint8Array(TILE_COUNT),
       population: 0,
+      arrivalWait: 0,
+      hungerDays: 0,
+      leaveWait: 0,
       jobs: 0,
       demand: { 1: 0, 2: 0, 3: 0 },
       happiness: 100,
@@ -190,12 +199,27 @@ export class Sim {
     return this.rng.state();
   }
 
-  /** Advances one game day: demand, happiness, growth on every lot, and the budget on month days. */
+  /** Advances one game day: the people engine, or demand, growth and the budget in the Motor city. */
   step(): void {
     const s = this.state;
     if (s.status === 'lost' || !s.founded) return;
     const settings = DIFFICULTY[s.difficulty];
     s.day++;
+    if (s.age === 'motor') this.stepMotor(settings);
+    else if (stepPeople(s, this.roadAccess(), settings)) this.lose();
+    if (s.day % DAYS_PER_MONTH === 0) s.rev.save++;
+    for (const count of POPULATION_MILESTONES) {
+      if (s.population >= count)
+        this.announce(`population:${count}`, { kind: 'population', count });
+    }
+    if (s.population >= settings.winTarget && this.announce('won', { kind: 'won' }))
+      s.status = 'won';
+    if (settings.debtLimit !== undefined && s.money < settings.debtLimit) this.lose();
+  }
+
+  /** The v1 day, until build step 8 folds it onto the people engine. */
+  private stepMotor(settings: DifficultySettings): void {
+    const s = this.state;
     Object.assign(s, computeDemand(s));
     const fields = this.fields();
     s.happiness = computeHappiness(s, fields);
@@ -204,21 +228,15 @@ export class Sim {
     if (s.day % DAYS_PER_MONTH === 0) {
       s.budget = settleMonth(s, settings);
       s.money += s.budget.income - s.budget.expenses;
-      s.rev.save++;
       const started = monthlyFire(s, fields, this.rng, settings);
       if (started !== undefined)
         this.events.push({ kind: 'fire', x: xOf(started), y: yOf(started) });
     }
-    for (const count of POPULATION_MILESTONES) {
-      if (s.population >= count)
-        this.announce(`population:${count}`, { kind: 'population', count });
-    }
-    if (s.population >= settings.winTarget && this.announce('won', { kind: 'won' }))
-      s.status = 'won';
-    if (settings.debtLimit !== undefined && s.money < settings.debtLimit) {
-      s.status = 'lost';
-      this.announce('lost', { kind: 'lost' });
-    }
+  }
+
+  private lose(): void {
+    this.state.status = 'lost';
+    this.announce('lost', { kind: 'lost' });
   }
 
   /** Sets fire to a developed lot or a service. For tests and the odd act of arson. */
