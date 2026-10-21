@@ -3,6 +3,7 @@ import { CameraControls } from './input/controls';
 import { Pointer } from './input/pointer';
 import { BuildTool } from './input/tools';
 import { BuildingLayer } from './render/buildings';
+import { CarLayer } from './render/cars';
 import { CursorLayer } from './render/cursor';
 import { FireLayer } from './render/fire';
 import type { Layer } from './render/layer';
@@ -36,6 +37,7 @@ export class Game {
     new RoadLayer(),
     new ZoneLayer(),
     new BuildingLayer(),
+    new CarLayer(),
     new FireLayer(),
   ];
   private readonly cursor = new CursorLayer();

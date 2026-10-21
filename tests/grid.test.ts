@@ -8,6 +8,7 @@ import {
   largestRegionSize,
   lineTiles,
   rectTiles,
+  roadPath,
   snapToAxis,
 } from '../src/sim/grid';
 
@@ -75,5 +76,28 @@ describe('lines and rectangles', () => {
   it('covers a rectangle from any two corners and clips it to the map', () => {
     expect(rectTiles(3, 3, 2, 2)).toEqual([idx(2, 2), idx(3, 2), idx(2, 3), idx(3, 3)]);
     expect(rectTiles(-1, 0, 0, 0)).toEqual([idx(0, 0)]);
+  });
+});
+
+describe('roadPath', () => {
+  const road = new Uint8Array(TILE_COUNT);
+  for (let x = 2; x <= 8; x++) road[idx(x, 5)] = 1;
+  for (let y = 5; y <= 9; y++) road[idx(8, y)] = 1;
+  road[idx(20, 20)] = 1;
+
+  it('follows the road from one tile to another', () => {
+    const path = roadPath(road, idx(2, 5), idx(8, 9));
+    expect(path?.[0]).toBe(idx(2, 5));
+    expect(path?.at(-1)).toBe(idx(8, 9));
+    expect(path).toHaveLength(11);
+    expect(path?.every((t) => road[t] === 1)).toBe(true);
+  });
+
+  it('is undefined between disconnected roads', () => {
+    expect(roadPath(road, idx(2, 5), idx(20, 20))).toBeUndefined();
+  });
+
+  it('is a single tile when start and end match', () => {
+    expect(roadPath(road, idx(4, 5), idx(4, 5))).toEqual([idx(4, 5)]);
   });
 });

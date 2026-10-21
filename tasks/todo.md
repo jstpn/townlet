@@ -16,7 +16,7 @@ Spec: tasks/spec.md. Tick as you go. Review rounds after every 3 or 4 code commi
 - [x] Review round B
 - [x] 9. Procedural buildings for every type, level and service; windows; variants
 - [x] 10. Fire: sim and effects, tests
-- [ ] 11. Cars on the road graph
+- [x] 11. Cars on the road graph
 - [ ] 12. Autosave and continue, tests
 - [ ] Review round C
 - [ ] 13. Post-processing, day and night polish, postcard

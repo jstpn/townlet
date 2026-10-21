@@ -131,3 +131,31 @@ export function distanceField(isSource: (tile: number) => boolean): Uint16Array 
 
 /** v held within [lo, hi]. */
 export const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+
+/** Shortest route along road tiles from one road tile to another, inclusive, or undefined when disconnected. */
+export function roadPath(road: Uint8Array, from: number, to: number): number[] | undefined {
+  if (road[from] === 0 || road[to] === 0) return undefined;
+  const cameFrom = new Int32Array(TILE_COUNT).fill(-1);
+  cameFrom[from] = from;
+  const queue = [from];
+  // Pushing while iterating is deliberate: the array is the BFS queue.
+  for (const tile of queue) {
+    if (tile === to) break;
+    const x = xOf(tile);
+    const y = yOf(tile);
+    for (const [dx, dy] of DIRS4) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!inBounds(nx, ny)) continue;
+      const next = idx(nx, ny);
+      if (road[next] === 0 || cameFrom[next] !== -1) continue;
+      cameFrom[next] = tile;
+      queue.push(next);
+    }
+  }
+  if (cameFrom[to] === -1) return undefined;
+  const path: number[] = [];
+  for (let tile = to; tile !== from; tile = cameFrom[tile]) path.push(tile);
+  path.push(from);
+  return path.reverse();
+}
