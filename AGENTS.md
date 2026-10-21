@@ -87,10 +87,12 @@ Full picture: docs/architecture.md
 
 ## Documentation
 
-| File                   | Purpose                                                 |
-| ---------------------- | ------------------------------------------------------- |
-| `docs/architecture.md` | Directory tree, frame loop, module reference, data flow |
-| `docs/commands.md`     | Every npm script                                        |
-| `tasks/spec.md`        | The agreed design contract and balance numbers          |
-| `tasks/done.md`        | The build order as shipped                              |
-| `e2e/peek.spec.ts`     | Screenshot variables for `npm run peek`                 |
+| File                   | Purpose                                                  |
+| ---------------------- | -------------------------------------------------------- |
+| `docs/architecture.md` | Directory tree, frame loop, module reference, data flow  |
+| `docs/commands.md`     | Every npm script                                         |
+| `tasks/spec.md`        | The agreed design contract and balance numbers, the ages |
+| `docs/ages.md`         | Research reference behind the ages: eras, games, sources |
+| `docs/archive/`        | Retired documents, kept word for word (spec-v1.md)       |
+| `tasks/done.md`        | The build order as shipped                               |
+| `e2e/peek.spec.ts`     | Screenshot variables for `npm run peek`                  |
