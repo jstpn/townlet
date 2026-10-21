@@ -32,7 +32,8 @@ function isSaveFile(file: Partial<SaveFile>): file is SaveFile {
   if (!isDifficulty(sim.difficulty) || typeof sim.seed !== 'string') return false;
   if (!AGES.includes(sim.age)) return false;
   if (!Array.isArray(sim.buildings) || !Array.isArray(sim.announced)) return false;
-  if (!Array.isArray(sim.held)) return false;
+  if (!Array.isArray(sim.held) || typeof sim.stock !== 'object' || !sim.stock) return false;
+  if (sim.research !== null && typeof sim.research !== 'object') return false;
   return SNAPSHOT_GRIDS.every((key) => Array.isArray(sim[key]) && sim[key].length === TILE_COUNT);
 }
 

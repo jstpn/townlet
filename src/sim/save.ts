@@ -59,9 +59,9 @@ export function snapshot(sim: Sim): SimSnapshot {
   const grids = {} as Record<GridKey, number[]>;
   for (const key of SNAPSHOT_GRIDS) grids[key] = Array.from(s[key]);
   return {
-    ...pick(s, SCALARS),
+    ...structuredClone(pick(s, SCALARS)),
     ...grids,
-    buildings: [...s.buildings.values()],
+    buildings: [...s.buildings.values()].map((b) => ({ ...b })),
     announced: [...s.announced],
     held: [...s.held],
     rng: sim.rngState,
@@ -78,8 +78,8 @@ export function restoreSim(snap: SimSnapshot): Sim {
   });
   const s = sim.state;
   for (const key of SNAPSHOT_GRIDS) s[key].set(snap[key]);
-  Object.assign(s, pick(snap, SCALARS));
-  s.buildings = new Map(snap.buildings.map((b) => [b.id, b]));
+  Object.assign(s, structuredClone(pick(snap, SCALARS)));
+  s.buildings = new Map(snap.buildings.map((b) => [b.id, { ...b }]));
   s.announced = new Set(snap.announced);
   s.held = new Set(snap.held);
   return sim;

@@ -157,3 +157,16 @@ describe('work', () => {
     expect(at(sim, 34, 34)?.wasted).toBe(0);
   });
 });
+
+describe('crowding', () => {
+  it('sends one resident over the beds away every four days on normal', () => {
+    const sim = camp(500);
+    sim.state.population = 8;
+    days(sim, 4);
+    expect(sim.state.population).toBe(7);
+    days(sim, 4);
+    expect(sim.state.population).toBe(6);
+    days(sim, 8);
+    expect(sim.state.population).toBe(6);
+  });
+});

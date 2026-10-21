@@ -40,3 +40,22 @@ describe('save', () => {
     expect(restored.state.terrain).toEqual(sim.state.terrain);
   });
 });
+
+describe('snapshots', () => {
+  it('share nothing mutable with the sim they came from or the sim they make', () => {
+    const sim = foundedSim({ age: 'forager' });
+    sim.placeRoadLine(20, 33, 44, 33);
+    sim.state.population = 2;
+    sim.startResearch('fire');
+    const snap = snapshot(sim);
+    const restored = restoreSim(snap);
+    days(sim, 3);
+    expect(snap.stock).toEqual({ food: 15, wood: 0, stone: 10 });
+    expect(snap.research).toEqual({ id: 'fire', daysLeft: 30 });
+    expect(restored.state.stock).toEqual(snap.stock);
+    expect(restored.state.research).toEqual(snap.research);
+    days(restored, 1);
+    expect(snap.buildings[0].workers).toBe(0);
+    expect(sim.state.research?.daysLeft).toBe(27);
+  });
+});

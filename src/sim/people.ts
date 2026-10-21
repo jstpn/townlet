@@ -1,6 +1,7 @@
 import { type Stock, isMain } from './ages';
 import { BUILDINGS, footprint } from './catalogue';
 import type { DifficultySettings } from './difficulty';
+import { idx, inBounds } from './grid';
 import type { Building, SimState } from './sim';
 
 /** Days of eating the stock must hold, for the town and the newcomer, before anyone arrives. */
@@ -13,10 +14,17 @@ function works(state: SimState, b: Building, roadAccess: Uint8Array): boolean {
   return isMain(state, b.kind) || footprint(b).some((t) => roadAccess[t] === 1);
 }
 
-/** Whether the terrain a workplace draws on lies within its radius. */
+/** Whether the terrain a workplace draws on lies within its radius. Runs daily, so no arrays. */
 function supplied(state: SimState, b: Building): boolean {
   const near = BUILDINGS[b.kind].makes?.near;
-  return !near || footprint(b, near.radius).some((t) => state.terrain[t] === near.terrain);
+  if (!near) return true;
+  const last = BUILDINGS[b.kind].size - 1;
+  for (let y = b.y - near.radius; y <= b.y + last + near.radius; y++) {
+    for (let x = b.x - near.radius; x <= b.x + last + near.radius; x++) {
+      if (inBounds(x, y) && state.terrain[idx(x, y)] === near.terrain) return true;
+    }
+  }
+  return false;
 }
 
 /** Manhattan distance from a building's corner to the nearest home's. */
@@ -65,8 +73,8 @@ function work(state: SimState, roadAccess: Uint8Array, caps: Stock): number {
 }
 
 /**
- * One day of residents in an engine age: they work, eat, leave while hungry or unhappy, and
- * arrive while a bed is free and the food holds. Returns true when the town has just been lost.
+ * One day of residents in an engine age: they work, eat, leave while hungry, unhappy or short of
+ * beds, and arrive while a bed is free and the food holds. Returns true when the town has just been lost.
  */
 export function stepPeople(
   state: SimState,
@@ -81,7 +89,8 @@ export function stepPeople(
   state.hungerDays = eaten < state.population ? state.hungerDays + 1 : 0;
   state.happiness = Math.max(0, 100 - HUNGER_PENALTY * state.hungerDays);
 
-  const unhappy = state.hungerDays > 0 || state.happiness < settings.leaveThreshold;
+  const unhappy =
+    state.hungerDays > 0 || state.happiness < settings.leaveThreshold || state.population > beds;
   state.leaveWait = unhappy && state.population > 0 ? state.leaveWait + 1 : 0;
   if (state.leaveWait >= settings.leaveDays) {
     state.leaveWait = 0;
