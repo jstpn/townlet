@@ -1,3 +1,5 @@
+import { Zone, type ZoneKind } from './types';
+
 /** Prices at normal difficulty, before the cost multiplier. */
 export const ROAD_COST = 10;
 export const ROAD_UPKEEP = 1;
@@ -43,6 +45,20 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   policeStation: { label: 'Police station', size: 1, cost: 450, upkeep: 40, radius: 10, services: ['police'], jobs: 0 },
   tree: { label: 'Tree', size: 1, cost: 5, upkeep: 0, radius: 0, services: [], jobs: 0 },
   plaza: { label: 'Plaza', size: 1, cost: 60, upkeep: 2, radius: 2, services: ['plaza'], jobs: 0 },
+};
+
+/** Residents (residential) or jobs (commercial, industrial) held by a full lot at levels 1 to 3. */
+export const ZONE_CAPACITY: Record<ZoneKind, readonly [number, number, number]> = {
+  [Zone.Residential]: [4, 12, 30],
+  [Zone.Commercial]: [3, 8, 20],
+  [Zone.Industrial]: [5, 12, 25],
+};
+
+/** Monthly tax base of a full lot at levels 1 to 3, before the tax rate. */
+export const TAX_BASE: Record<ZoneKind, readonly [number, number, number]> = {
+  [Zone.Residential]: [2, 6, 15],
+  [Zone.Commercial]: [3, 8, 20],
+  [Zone.Industrial]: [4, 10, 22],
 };
 
 export function isBuildingKind(value: string): value is BuildingKind {

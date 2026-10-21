@@ -10,7 +10,7 @@ Spec: tasks/spec.md. Tick as you go. Review rounds after every 3 or 4 code commi
 - [x] 4. Roads: sim, auto-tiling, render, drag tool, tests
 - [x] 5. Zones, building catalogue, placement rules, bulldoze, placeholder meshes, tests
 - [x] Review round A
-- [ ] 6. Coverage, pollution, demand, growth, occupancy, population, tests
+- [x] 6. Coverage, pollution, demand, growth, occupancy, population, tests
 - [ ] 7. Economy, tax, happiness, debt, win and lose, tests
 - [ ] 8. HUD: start screen, top bar, build menu, info panel, budget, toasts, title cards, pause menu, hints
 - [ ] Review round B

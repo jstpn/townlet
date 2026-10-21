@@ -6,8 +6,11 @@ import {
   type BuildingKind,
 } from './catalogue';
 import { DIFFICULTY, type Difficulty } from './difficulty';
+import { type Coverage, computeCoverage, computePollution, computeRoadAccess } from './fields';
 import { TILE_COUNT, idx, inBounds, lineTiles, rectTiles, snapToAxis, xOf, yOf } from './grid';
+import { type Demand, computeDemand, stepGrowth } from './growth';
 import { generateMap } from './mapgen';
+import { type Rng, createRng } from './rng';
 import { Terrain, Zone, type ZoneKind } from './types';
 
 export type SimOptions = {
@@ -58,6 +61,14 @@ export type SimState = {
   buildings: Map<number, Building>;
   nextBuildingId: number;
   townHallId: number | undefined;
+  /** Days a developed lot has sat near-empty with negative demand, and days it has been undesirable. */
+  starveDays: Uint8Array;
+  blightDays: Uint8Array;
+  population: number;
+  jobs: number;
+  demand: Demand;
+  /** 0 to 100. Computed by the economy; lots empty out below the difficulty's leave threshold. */
+  happiness: number;
   /** Bumped whenever the matching layer changes, so renderers know what to rebuild. */
   rev: { terrain: number; roads: number; zones: number; buildings: number };
 };
@@ -65,9 +76,16 @@ export type SimState = {
 /** The whole town simulation: state plus the commands that change it. Deterministic, no DOM. */
 export class Sim {
   readonly state: SimState;
+  private readonly rng: Rng;
+  private readonly cache = {
+    coverage: { rev: -1, value: undefined as Coverage | undefined },
+    roadAccess: { rev: -1, value: undefined as Uint8Array | undefined },
+    pollution: { rev: -1, value: undefined as Float32Array | undefined },
+  };
 
   constructor(options: SimOptions) {
     const settings = DIFFICULTY[options.difficulty];
+    this.rng = createRng(options.seed + ':sim');
     this.state = {
       seed: options.seed,
       difficulty: options.difficulty,
@@ -82,8 +100,51 @@ export class Sim {
       buildings: new Map(),
       nextBuildingId: 1,
       townHallId: undefined,
+      starveDays: new Uint8Array(TILE_COUNT),
+      blightDays: new Uint8Array(TILE_COUNT),
+      population: 0,
+      jobs: 0,
+      demand: { residential: 0, commercial: 0, industrial: 0 },
+      happiness: 100,
       rev: { terrain: 0, roads: 0, zones: 0, buildings: 0 },
     };
+  }
+
+  /** Advances one game day: demand, then growth on every lot. */
+  step(): void {
+    const s = this.state;
+    s.day++;
+    Object.assign(s, computeDemand(s));
+    const fields = {
+      coverage: this.coverage(),
+      roadAccess: this.roadAccess(),
+      pollution: this.pollution(),
+    };
+    if (stepGrowth(s, fields, this.rng, DIFFICULTY[s.difficulty])) s.rev.zones++;
+  }
+
+  coverage(): Coverage {
+    return this.cached(this.cache.coverage, this.state.rev.buildings, computeCoverage);
+  }
+
+  roadAccess(): Uint8Array {
+    return this.cached(this.cache.roadAccess, this.state.rev.roads, computeRoadAccess);
+  }
+
+  pollution(): Float32Array {
+    return this.cached(this.cache.pollution, this.state.rev.zones, computePollution);
+  }
+
+  private cached<T>(
+    slot: { rev: number; value: T | undefined },
+    rev: number,
+    compute: (state: SimState) => T,
+  ): T {
+    if (slot.value === undefined || slot.rev !== rev) {
+      slot.value = compute(this.state);
+      slot.rev = rev;
+    }
+    return slot.value;
   }
 
   /**

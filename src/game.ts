@@ -16,6 +16,8 @@ import type { Difficulty } from './sim/difficulty';
 import { Sim } from './sim/sim';
 import { Zone } from './sim/types';
 
+const DAY_SECONDS = 0.5;
+
 export type GameOptions = {
   seed: string;
   difficulty: Difficulty;
@@ -39,6 +41,9 @@ export class Game {
   private readonly pointer: Pointer;
   private readonly controls: CameraControls;
   private readonly clock = new THREE.Clock();
+  /** Sim speed multiplier: 0 pauses, 1 to 3 run. One day lasts half a second at 1x. */
+  speed = 1;
+  private dayClock = 0;
   private readonly unbindKeys: () => void;
   private previewRev = -1;
 
@@ -62,6 +67,7 @@ export class Game {
       p: () => this.tool.setTool({ kind: 'building', building: 'park' }),
       b: () => this.tool.setTool({ kind: 'bulldoze' }),
       escape: () => this.tool.setTool({ kind: 'none' }),
+      ' ': () => (this.speed = this.speed === 0 ? 1 : 0),
     });
     this.gfx.renderer.setAnimationLoop(this.frame);
   }
@@ -92,9 +98,20 @@ export class Game {
     this.controls.update(dt);
     this.gfx.rig.update(dt);
     this.tool.update();
+    this.tick(dt);
     this.syncLayers();
     this.gfx.render();
   };
+
+  private tick(dt: number): void {
+    this.dayClock += dt * this.speed;
+    // Catch up at most a few days per frame so a background tab does not fast-forward the town.
+    for (let n = 0; this.dayClock >= DAY_SECONDS && n < 4; n++) {
+      this.dayClock -= DAY_SECONDS;
+      this.sim.step();
+    }
+    if (this.dayClock > DAY_SECONDS) this.dayClock = 0;
+  }
 
   private syncLayers(): void {
     let rebuilt = false;
