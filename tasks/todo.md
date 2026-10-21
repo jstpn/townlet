@@ -53,7 +53,7 @@ Steps, one commit each, failure modes written as red tests first:
       `starveDays` days, stop arrivals and dent happiness; the last one leaving does not lose the
       game on normal or does on easy; the motor city's population changes behaviour. Check:
       `npm run check`.
-- [ ] 3. `feat: workplaces take the nearest residents and make stock` (`src/sim/people.ts`,
+- [x] 3. `feat: workplaces take the nearest residents and make stock` (`src/sim/people.ts`,
       `tests/people.test.ts`). Fails if: a gathering hut by forest and a path makes anything but
       2 food a worker a day; a hut with no path or no forest within 3 takes workers; the nearer of
       two huts does not fill first; residents fill more slots than there are residents; stock

@@ -64,7 +64,15 @@ export type PlanTile = { x: number; y: number; status: PlanStatus };
 /** What a command would do, priced in coin and materials, so the UI can preview it before committing. */
 export type Plan = { tiles: PlanTile[]; cost: number; materials?: Stock; error?: CommandError };
 
-export type Building = { id: number; kind: BuildingKind; x: number; y: number };
+export type Building = {
+  id: number;
+  kind: BuildingKind;
+  x: number;
+  y: number;
+  /** Residents in its slots today, and what it made today over the cap. */
+  workers: number;
+  wasted: number;
+};
 
 export type GameStatus = 'playing' | 'won' | 'lost';
 
@@ -206,7 +214,7 @@ export class Sim {
     const settings = DIFFICULTY[s.difficulty];
     s.day++;
     if (s.age === 'motor') this.stepMotor(settings);
-    else if (stepPeople(s, this.roadAccess(), settings)) this.lose();
+    else if (stepPeople(s, this.roadAccess(), this.caps(), settings)) this.lose();
     if (s.day % DAYS_PER_MONTH === 0) s.rev.save++;
     for (const count of POPULATION_MILESTONES) {
       if (s.population >= count)
@@ -402,7 +410,7 @@ export class Sim {
     if (plan.error) return { ok: false, reason: plan.error };
     const id = this.state.nextBuildingId++;
     const main = kind === AGE_DEFS[this.state.age].main;
-    this.state.buildings.set(id, { id, kind, x, y });
+    this.state.buildings.set(id, { id, kind, x, y, workers: 0, wasted: 0 });
     if (main) this.state.founded = true;
     const result = this.execute(plan, (tile) => {
       this.clearForest(tile);

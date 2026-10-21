@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Difficulty } from '../src/sim/difficulty';
-import { Sim } from '../src/sim/sim';
+import { idx } from '../src/sim/grid';
+import { type Building, Sim } from '../src/sim/sim';
 import { Terrain } from '../src/sim/types';
 import { days, flatTerrain } from './helpers';
 
@@ -100,5 +101,65 @@ describe('eating', () => {
     sim.step();
     expect(sim.state.happiness).toBe(100);
     expect(sim.state.population).toBe(3);
+  });
+});
+
+describe('work', () => {
+  /** A camp at (30, 30) with a path along y = 33 from x 20 to 44 and forest at the tiles given. */
+  function village(population: number, forest: [number, number][]): Sim {
+    const sim = camp(100);
+    sim.placeRoadLine(20, 33, 44, 33);
+    for (const [x, y] of forest) sim.state.terrain[idx(x, y)] = Terrain.Forest;
+    sim.state.stock = { food: 50, wood: 40, stone: 40 };
+    sim.state.population = population;
+    return sim;
+  }
+  const at = (sim: Sim, x: number, y: number): Building | undefined =>
+    [...sim.state.buildings.values()].find((b) => b.x === x && b.y === y);
+
+  it('staffs the camp first, then makes two food a worker at a gathering hut by forest', () => {
+    const sim = village(4, [[37, 34]]);
+    sim.placeBuilding('gatheringHut', 34, 34);
+    sim.step();
+    expect(at(sim, 30, 30)?.workers).toBe(2);
+    expect(at(sim, 34, 34)?.workers).toBe(2);
+    expect(sim.state.stock.food).toBe(50);
+  });
+
+  it('gives no workers to a hut without a path or without forest within three', () => {
+    const sim = village(6, [[10, 13]]);
+    sim.placeBuilding('gatheringHut', 34, 35);
+    sim.placeBuilding('gatheringHut', 10, 10);
+    sim.step();
+    expect(at(sim, 34, 35)?.workers).toBe(0);
+    expect(at(sim, 10, 10)?.workers).toBe(0);
+    expect(sim.state.stock.food).toBe(44);
+  });
+
+  it('fills the hut nearer a dwelling first and never more slots than residents', () => {
+    const sim = village(3, [
+      [41, 31],
+      [26, 35],
+    ]);
+    sim.placeBuilding('gatheringHut', 40, 34);
+    sim.placeBuilding('gatheringHut', 27, 34);
+    sim.step();
+    expect(at(sim, 27, 34)?.workers).toBe(1);
+    expect(at(sim, 40, 34)?.workers).toBe(0);
+    const lone = village(1, []);
+    lone.step();
+    expect(at(lone, 30, 30)?.workers).toBe(1);
+  });
+
+  it('stops the stock at its cap and records what was wasted', () => {
+    const sim = village(4, [[37, 34]]);
+    sim.placeBuilding('woodcutter', 34, 34);
+    sim.state.stock.wood = 38;
+    sim.step();
+    expect(sim.state.stock.wood).toBe(40);
+    expect(at(sim, 34, 34)?.wasted).toBe(2);
+    sim.state.stock.wood = 0;
+    sim.step();
+    expect(at(sim, 34, 34)?.wasted).toBe(0);
   });
 });
