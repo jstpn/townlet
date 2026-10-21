@@ -7,12 +7,96 @@ Finished items move to tasks/done.md.
 
 ### Build step 2: the Forager age
 
-To be planned: spec section 17, step 2, with the walkers moved here from step 1.
+Spec section 17, step 2: the Forager playable end to end in the browser, from the camp to the
+age-up's conditions. Agreed in grilling, 21 Oct 2026 (Q1 to Q8, all as recommended).
 
-For step 2, from the review: the founding, already-built and protected error texts name the
-town hall, so build them from the age's main building; and give each age its own path, bulldoze
-and clearing prices instead of zeroing coin prices in ages without coin, so the Village can price
-paths in wood and the menu stops showing wood-priced buildings as free.
+Decisions:
+
+- Q1. The start screen gains an age row listing the ages built, Forager (the default for a new
+  town) and Motor city; `?age=` sets it from the URL as `?seed=` does. The button reads "Found the
+  camp" in the Forager.
+- Q2, Q3. Rock and ore come from a new noise drawn after the hills, so every seed keeps its land,
+  forest and heights and only some grass turns to rock or ore: two to four rock clusters and two
+  to three ore clusters, each 5 to 12 tiles, at least 12 tiles from the map centre (tune). Paths
+  cross them; zones and buildings refuse them with a new `rock` error, except the flint pit, which
+  stands beside rock. The Motor city gets the same maps; its autoplayer bounds and README shots are
+  retaken.
+- Q4. "The first store" shows at the bottom of the tree with its conditions ticking, but cannot
+  start until step 3 brings the Village (`later` error, "The Village comes in a later build").
+- Q5. Grinding stones only raises gathering yield; the spec's grain store clause is dropped.
+- Q6. Lean season: December to February. Each month start rolls the month after next, so the dog
+  can warn a month ahead; easy never, normal a half chance, hard always. A lean month halves
+  gathering and hunting yields; the first one toasts the drying rack as the answer.
+- Q7. Signs come now, for buildings: a workplace with no workers, no path, nothing to draw on or a
+  full store, and a dwelling with no path. The sign layer takes positions and a tint, so step 8
+  reuses it for lots.
+- Q8. Walkers: one figure per working resident outside the main building, up to 200, between a
+  path tile beside its home and one beside its workplace, carrying its resource's item; their
+  number falls to none with the night.
+- My calls: advancement effects are data on the advancement (a building's yield, radius or beds,
+  or keeping food), applied by one `effective(state, kind)` lookup; food decays 2% a day until
+  Fire; happiness is (3 x food store + variety + faith) / 5 less 10 per day of hunger, where food
+  store is 5 points a day of eating up to 100, variety 100 x working food kinds / 3, and faith the
+  share of beds within the totem's radius 6; the snapshot gains the lean state, so the save goes
+  to version 4; the palettes gain `rock`, `ore` and `path` roles; the camp's fire is an emissive
+  flame the night bloom picks up, not a light; per-age path and clearing prices wait for the
+  Village, the first age that charges for them.
+
+Steps, one commit each, failure modes written as red tests first:
+
+- [ ] 1. `feat: rock and ore on the map` (`src/sim/mapgen.ts`, `src/sim/types.ts`, `src/sim/sim.ts`,
+      `scripts/mapdump.ts`, `src/render/terrain.ts`, `src/render/palette.ts`, `src/ui/hud.ts`,
+      tests). Fails if: two seeds' terrain differs from before anywhere but rock and ore over grass,
+      or their heights differ at all; a seed has outside two to four rock or two to three ore
+      clusters, a cluster outside 5 to 12 tiles, or any within 12 of the centre or on sand, water or
+      forest; a zone, tent or town hall goes on rock; a path does not. The hills hashes are
+      re-pinned. Check: `npm run check`, `npm run mapdump -- budapest moonrise`.
+- [ ] 2. `feat: the rest of the Forager catalogue` (`src/sim/catalogue.ts`, `src/sim/ages.ts`,
+      `src/sim/sim.ts`, `src/sim/people.ts`, tests). Hunting hut, fishing hut, flint pit, totem.
+      Fails if: a fishing hut not touching water is placed; a flint pit without rock within 3 or a
+      hunting hut without forest within 4 makes anything; yields are not 3, 3 and 2 a worker.
+- [ ] 3. `feat: Forager advancements and their effects` (`src/sim/advancements.ts`, tests). Bow,
+      Nets, The dog, Shelter (Nets or Bow, optional), The first store. Fails if: food does not
+      decay 2% a day before Fire or does after; a held effect does not change its yield, radius or
+      beds; Shelter starts with neither Nets nor Bow; the first store starts at all, or reports a
+      condition met that is not.
+- [ ] 4. `feat: Forager happiness and the lean season` (`src/sim/people.ts`, `src/sim/hazards.ts`,
+      `src/sim/save.ts`, `src/save.ts`, tests). Fails if: happiness differs from the formula for a
+      hand-built case; a lean month comes on easy, misses on hard, falls outside winter or fails to
+      halve gathering and hunting (and only those); the dog's warning is not a month ahead; the
+      first lean month does not raise its event; a save round trip loses the lean state.
+- [ ] 5. Review round A: `/simplify` then `/code-review` over steps 1 to 4.
+- [ ] 6. `feat: the start screen and top bar follow the age` (`src/ui/startScreen.ts`,
+      `src/main.ts`, `src/game.ts`, `src/ui/hud.ts`, `e2e/boot.ts`). Age row; top bar shows the
+      age's stock and caps, residents and beds, happiness and the calendar, and drops the treasury
+      and demand in the Forager; build menu by age (Paths, Homes, Food, Materials, Institutions,
+      Storage, Bulldoze, keys 1 to 7) with materials prices; founding card, hints and error texts
+      from the age's main building. Check: `npm run check`, `npm run e2e`, `npm run peek` with
+      `?age=forager`, desktop and MOBILE=1.
+- [ ] 7. `feat: the info panel and advancements panel` (`src/ui/hud.ts`, `src/style.css`). Info
+      panel: workers "1 of 2 workers", what it made, wasted over the cap, what it needs. The
+      advancements panel: the tree with prerequisites, costs, the research bar and the age-up's
+      conditions. Check: `npm run check`, `npm run peek` by eye.
+- [ ] 8. `feat: signs on stuck buildings` (`src/sim/people.ts`, `src/sim/sim.ts`,
+      `src/render/signs.ts`, `src/game.ts`, tests). `buildingReport` gives the reasons the panel and
+      the signs share. Fails if: a stuck workplace or pathless tent has no reason, or a working one
+      has any. Check: `npm run check`, `npm run peek`.
+- [ ] 9. Review round B over steps 6 to 8.
+- [ ] 10. `feat: the Forager look` (`src/render/models.ts`, `src/render/buildings.ts`,
+      `src/render/roads.ts`, `src/render/terrain.ts`). Models for the nine buildings, dirt paths,
+      boulders on rock, the camp fire glowing at night. Check: `npm run peek`, day and night, each
+      palette.
+- [ ] 11. `feat: walkers on the paths` (`src/render/walkers.ts`, `src/game.ts`). Check: `npm run
+    peek` at noon and midnight.
+- [ ] 12. `test: a Forager start in the browser` (`e2e/forager.spec.ts`): boots `?age=forager`,
+      founds the camp, lays a path, builds a gathering hut by forest, sees the first arrival and the
+      hut's first worker, screenshot to `e2e/screenshots/forager.png`. Check: `npm run e2e`.
+- [ ] 13. `test: the autoplayer plays the Forager to its age-up` (`tests/autoplayer.ts`,
+      `tests/autoplay.test.ts`): from a fresh camp on each difficulty, every age-up condition met
+      within a bound set from the first runs and written into the spec; never lost on easy. The
+      Motor bounds are re-checked against the new maps. Check: `npm run check`.
+- [ ] 14. `docs: the Forager` (README, `docs/architecture.md`), then `npm run shots`.
+- [ ] 15. Review round C over steps 10 to 13. Move this item to tasks/done.md.
 
 ## Later
 

@@ -71,7 +71,7 @@ The sim counts people; it never simulates one.
   between dwellings and workplaces along paths, each carrying the item of its
   workplace (a basket, a log, a block, an ore sack, a sheaf). They are rebuilt
   from the counts when the roads, buildings or population change; nothing in
-  the sim reads them.
+  the sim reads them. At night they walk home and the paths empty.
 
 ## 5. Resources and stock
 
@@ -123,7 +123,8 @@ The sim counts people; it never simulates one.
   the age's traffic.
 - **Placement** as v1: a footprint sits entirely on grass, sand or forest with
   no road or building on it. Quarries sit on rock; mines on ore; fishing huts,
-  trading posts and harbours touch water.
+  trading posts and harbours touch water. Paths may cross rock and ore; zones
+  and every other building may not.
 - **Coverage** as v1: one boolean grid per service kind, Chebyshev radius from
   any footprint tile, recomputed when buildings change.
 - **Happiness** 0 to 100, recomputed daily, a weighted mean of the age's
@@ -177,13 +178,16 @@ Advancements, in order of availability:
 | Bow             | Fire, hunting hut                                                | 15 wood 10 stone | Hunting yield 3 to 5                             |
 | Nets            | Fire, fishing hut                                                | 15 wood          | Fishing yield 3 to 5                             |
 | The dog         | Bow                                                              | 20 food          | Hunting hut radius 4 to 6, warns of hazard early |
-| Grinding stones | Fire, gathering hut                                              | 20 stone         | Gathering yield 2 to 3, unlocks the grain store  |
+| Grinding stones | Fire, gathering hut                                              | 20 stone         | Gathering yield 2 to 3                           |
 | Shelter         | Nets or Bow, optional                                            | 20 wood 10 stone | Tent 3 beds to 4                                 |
 | The first store | Grinding stones, totem and drying rack standing; 80 food 40 wood | the age-up       | Village                                          |
 
-Hazard: hunger, a lean season each winter month on normal and hard: gathering
-and hunting yields halve for the month. Mitigation: the drying rack (its cap
-sees the town through); the dog gives a toast a month ahead.
+Hazard: hunger, a lean season in winter (December, January, February):
+gathering and hunting yields halve for a lean month. Easy has none; on normal
+each winter month is lean with a chance of one half, on hard every winter month
+is lean (tune). Mitigation: the drying rack (its cap sees the town through),
+named in a toast the first time a lean month comes; the dog gives a toast a
+month ahead.
 
 Happiness: food store (days of eating in stock, 100 at 20 days, weight 3), food
 variety (kinds of food building working, 0 to 3, weight 1), faith (share of
