@@ -1,3 +1,4 @@
+import type { AdvancementId } from './advancements';
 import { type Building, Sim, type SimState } from './sim';
 
 export const SNAPSHOT_GRIDS = [
@@ -23,6 +24,7 @@ const SCALARS = [
   'day',
   'money',
   'stock',
+  'research',
   'nextBuildingId',
   'founded',
   'population',
@@ -38,8 +40,13 @@ const SCALARS = [
 ] as const;
 
 /** The sim as plain JSON-safe data: typed arrays become number arrays, the map and set become lists. */
-export type SimSnapshot = Omit<SimState, GridKey | 'buildings' | 'announced' | 'rev'> &
-  Record<GridKey, number[]> & { buildings: Building[]; announced: string[]; rng: number };
+export type SimSnapshot = Omit<SimState, GridKey | 'buildings' | 'announced' | 'held' | 'rev'> &
+  Record<GridKey, number[]> & {
+    buildings: Building[];
+    announced: string[];
+    held: AdvancementId[];
+    rng: number;
+  };
 
 function pick<T, K extends keyof T>(from: T, keys: readonly K[]): Pick<T, K> {
   const out = {} as Pick<T, K>;
@@ -56,6 +63,7 @@ export function snapshot(sim: Sim): SimSnapshot {
     ...grids,
     buildings: [...s.buildings.values()],
     announced: [...s.announced],
+    held: [...s.held],
     rng: sim.rngState,
   };
 }
@@ -73,5 +81,6 @@ export function restoreSim(snap: SimSnapshot): Sim {
   Object.assign(s, pick(snap, SCALARS));
   s.buildings = new Map(snap.buildings.map((b) => [b.id, b]));
   s.announced = new Set(snap.announced);
+  s.held = new Set(snap.held);
   return sim;
 }

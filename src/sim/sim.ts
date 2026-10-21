@@ -1,3 +1,10 @@
+import {
+  type AdvancementId,
+  researchCost,
+  researchDays,
+  researchError,
+  stepResearch,
+} from './advancements';
 import { AGE_DEFS, type Age, RESOURCES, type Stock, computeCaps, scaleStock } from './ages';
 import {
   BUILDINGS,
@@ -52,7 +59,10 @@ export type CommandError =
   | 'already-built'
   | 'protected'
   | 'wrong-age'
-  | 'short';
+  | 'short'
+  | 'locked'
+  | 'busy'
+  | 'held';
 
 export type CommandResult = { ok: true; cost: number } | { ok: false; reason: CommandError };
 
@@ -83,7 +93,8 @@ export type SimEvent =
   | { kind: 'population'; count: number }
   | { kind: 'won' }
   | { kind: 'lost' }
-  | { kind: 'fire'; x: number; y: number };
+  | { kind: 'fire'; x: number; y: number }
+  | { kind: 'advanced'; id: AdvancementId };
 
 export const DAYS_PER_MONTH = 30;
 export const POPULATION_MILESTONES = [100, 500, 1000, 2500, 5000, 10000];
@@ -97,6 +108,9 @@ export type SimState = {
   /** The treasury, coin. */
   money: number;
   stock: Stock;
+  /** Advancements completed, and the one being researched. */
+  held: Set<AdvancementId>;
+  research: { id: AdvancementId; daysLeft: number } | null;
   terrain: Uint8Array;
   /** Terrace level per tile, 0 to 2. Never changes after generation. */
   height: Uint8Array;
@@ -174,6 +188,8 @@ export class Sim {
       day: 0,
       money: options.money ?? (AGE_DEFS[age].coin ? settings.startingMoney : 0),
       stock: scaleStock(AGE_DEFS[age].caps, settings.startingStock),
+      held: new Set(),
+      research: null,
       terrain: map.terrain,
       height: map.height,
       road: new Uint8Array(TILE_COUNT),
@@ -215,6 +231,11 @@ export class Sim {
     s.day++;
     if (s.age === 'motor') this.stepMotor(settings);
     else if (stepPeople(s, this.roadAccess(), this.caps(), settings)) this.lose();
+    const advanced = stepResearch(s);
+    if (advanced) {
+      this.events.push({ kind: 'advanced', id: advanced });
+      s.rev.save++;
+    }
     if (s.day % DAYS_PER_MONTH === 0) s.rev.save++;
     for (const count of POPULATION_MILESTONES) {
       if (s.population >= count)
@@ -262,6 +283,19 @@ export class Sim {
       if (this.state.buildingId[tile] !== -1) this.removeBuilding(tile);
       else this.razeLot(tile);
     }
+  }
+
+  /** Pays for an advancement of the age and starts researching it. */
+  startResearch(id: AdvancementId): CommandResult {
+    const s = this.state;
+    const error = researchError(s, id);
+    if (error) return { ok: false, reason: error };
+    const cost = researchCost(s, id);
+    for (const [r, amount] of Object.entries(cost) as [keyof Stock, number][])
+      s.stock[r] = (s.stock[r] ?? 0) - amount;
+    s.research = { id, daysLeft: researchDays(s) };
+    s.rev.save++;
+    return { ok: true, cost: 0 };
   }
 
   setTaxRate(rate: number): void {

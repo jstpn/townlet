@@ -3,6 +3,7 @@ import type { Game } from '../game';
 import { bindKeys } from '../input/keymap';
 import type { Tool } from '../input/tools';
 import { PALETTE_NAMES } from '../render/palette';
+import { ADVANCEMENTS } from '../sim/advancements';
 import {
   BUILDINGS,
   BULLDOZE_COST,
@@ -49,6 +50,7 @@ const EVENT_CUE: Record<SimEvent['kind'], Cue> = {
   won: 'won',
   lost: 'lost',
   fire: 'fire',
+  advanced: 'chime',
 };
 
 const ERROR_TEXT: Record<CommandError, string> = {
@@ -63,6 +65,9 @@ const ERROR_TEXT: Record<CommandError, string> = {
   protected: 'The town hall stays.',
   'wrong-age': 'That belongs to another age.',
   short: 'The stores are short of materials for that.',
+  locked: 'That is not within reach yet.',
+  busy: 'One discovery at a time.',
+  held: 'The town already knows that.',
 };
 
 const HINTS = [
@@ -454,6 +459,9 @@ export class Hud {
         break;
       case 'fire':
         this.toast(`Fire at ${event.x}, ${event.y}.`, true);
+        break;
+      case 'advanced':
+        this.toast(`${ADVANCEMENTS[event.id].label} is learnt.`);
         break;
     }
     this.game.sound.play(EVENT_CUE[event.kind]);

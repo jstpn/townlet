@@ -58,7 +58,7 @@ Steps, one commit each, failure modes written as red tests first:
       2 food a worker a day; a hut with no path or no forest within 3 takes workers; the nearer of
       two huts does not fill first; residents fill more slots than there are residents; stock
       passes its cap; the overflow is not recorded for the panel. Check: `npm run check`.
-- [ ] 4. `feat: advancements researched one at a time` (`src/sim/advancements.ts`,
+- [x] 4. `feat: advancements researched one at a time` (`src/sim/advancements.ts`,
       `tests/advancements.test.ts`). Fails if: Fire is not available at a founded camp; Grinding
       stones is available without Fire or without a gathering hut standing; research starts while
       another runs, without the stock, or twice; the cost is not paid at once; it completes in

@@ -4,6 +4,8 @@ export type Difficulty = (typeof DIFFICULTIES)[number];
 export type DifficultySettings = {
   label: string;
   startingMoney: number;
+  /** Research takes this times its days. */
+  researchMultiplier: number;
   /** Share of the age's base caps in stock at the start. */
   startingStock: number;
   costMultiplier: number;
@@ -27,6 +29,7 @@ export const DIFFICULTY: Record<Difficulty, DifficultySettings> = {
     label: 'Easy',
     startingMoney: 20000,
     startingStock: 0.5,
+    researchMultiplier: 0.8,
     costMultiplier: 0.8,
     upkeepMultiplier: 0.8,
     growthRate: 0.05,
@@ -42,6 +45,7 @@ export const DIFFICULTY: Record<Difficulty, DifficultySettings> = {
     label: 'Normal',
     startingMoney: 10000,
     startingStock: 0.25,
+    researchMultiplier: 1,
     costMultiplier: 1,
     upkeepMultiplier: 1,
     growthRate: 0.035,
@@ -57,6 +61,7 @@ export const DIFFICULTY: Record<Difficulty, DifficultySettings> = {
     label: 'Hard',
     startingMoney: 6000,
     startingStock: 0.15,
+    researchMultiplier: 1.25,
     costMultiplier: 1.25,
     upkeepMultiplier: 1.3,
     growthRate: 0.025,
