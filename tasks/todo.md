@@ -67,8 +67,14 @@ Steps, one commit each, failure modes written as red tests first:
 - [ ] 5. `feat: save version 3` (`src/sim/save.ts`, `src/save.ts`, `tests/save.test.ts`). Fails
       if: a forager town mid-research does not round-trip and then simulate identically; a
       version 2 save is read. Check: `npm run check`, `npm run e2e`.
-- [ ] 6. Review round: `/simplify` then `/code-review` over steps 1 to 5, fixes as `chore:`, gate
+- [x] 6. Review round: `/simplify` then `/code-review` over steps 1 to 4 (run before step 5,
+      at four code commits), fixes as `chore:`, gate
       rerun with output shown.
+
+For step 2, from the review: the founding, already-built and protected error texts name the
+town hall, so build them from the age's main building; and give each age its own path, bulldoze
+and clearing prices instead of zeroing coin prices in ages without coin, so the Village can price
+paths in wood and the menu stops showing wood-priced buildings as free.
 
 ## Later
 

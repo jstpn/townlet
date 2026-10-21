@@ -64,8 +64,9 @@ The sim counts people; it never simulates one.
   is empty the town starves: one resident leaves every `starveDays` days
   (tune), happiness falls by 10 a day to a floor of 0, and no one arrives. A
   town that reaches zero residents is lost on normal and hard.
-- **Leaving.** Below the leave threshold of happiness, one resident leaves every
-  `leaveDays` days (tune) and no one arrives.
+- **Leaving.** Below the leave threshold of happiness, or while residents
+  outnumber the beds (a dwelling bulldozed or cut off from its path), one
+  resident leaves every `leaveDays` days (tune) and no one arrives.
 - **Walkers** are decoration, like cars today: up to 200 figures (tune) drawn
   between dwellings and workplaces along paths, each carrying the item of its
   workplace (a basket, a log, a block, an ore sack, a sheaf). They are rebuilt
@@ -96,8 +97,8 @@ The sim counts people; it never simulates one.
 - Each age has six to eight advancements in a small tree. An advancement is
   available when its earlier advancements are held and the building it names
   is standing. It costs a stock of the age's resources, paid at once, and takes
-  `researchDays` days (tune) during which the panel shows a progress bar. One
-  advancement at a time.
+  `researchDays` days (30 at normal times the difficulty's research multiplier,
+  tune) during which the panel shows a progress bar. One advancement at a time.
 - No hidden boosts, no discounts for deeds. The whole tree of the current age
   fits one panel; later ages are greyed with their names only.
 - The last advancement of an age is the **age-up**. It needs two named
