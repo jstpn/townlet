@@ -12,7 +12,7 @@ and happiness. Three difficulty levels change how hard the economy pushes back.
 The look is procedural low-poly 3D in Wes Anderson palettes.
 
 Not in version one: weather, traffic simulation, power lines or pipes,
-loans, multiple save slots, touch, audio, accounts, any backend.
+loans, multiple save slots, accounts, any backend.
 
 ## 2. Stack
 
@@ -20,8 +20,8 @@ loans, multiple save slots, touch, audio, accounts, any backend.
 - Simulation: pure TypeScript with no DOM or Three imports. Deterministic from a
   seed plus the list of commands. Vitest, tests written first.
 - HUD: plain DOM and CSS driven by a small observable store.
-- ESLint flat config and Prettier. `npm run check` runs lint, typecheck, tests.
-- One Playwright smoke test: boot, build a few tiles, screenshot.
+- ESLint flat config and Prettier. `npm run check` runs lint, typecheck, prettier, tests.
+- Playwright: a smoke test, a touch test, and tagged specs for pictures and peeks.
 - npm through the socket hook, package-lock committed.
 - Git on `dev`. Public GitHub repo `jstpn/townlet`, MIT. Deployment deferred:
   Joe plays locally for now.

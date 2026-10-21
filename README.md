@@ -81,15 +81,19 @@ bumps when something changes. The HUD in `src/ui` is built once from DOM and
 derived per frame.
 
 ```bash
-npm run check     # lint, typecheck, unit tests
-npm run e2e       # Playwright smoke tests against the dev server
+npm run check     # lint, typecheck, prettier, unit tests
+npm run e2e       # Playwright tests against the dev server
+npm run peek      # one screenshot of the running game, see e2e/peek.spec.ts
 npm run shots     # retakes the README screenshots from an autoplayed town
-npm run mapdump   # prints a generated map as text for a seed
 ```
 
 The unit tests include a headless autoplayer that founds and grows a town on
-each difficulty and asserts it wins within a bounded number of months. The
-design notes and build order live in `tasks/spec.md`.
+each difficulty and asserts it wins within a bounded number of months. GitHub
+Actions runs the checks and the Playwright suite on every push.
+
+The design contract is `tasks/spec.md`, the module reference is
+`docs/architecture.md`, and `AGENTS.md` holds the working rules for coding
+agents.
 
 ## Licence
 
