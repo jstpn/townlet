@@ -86,8 +86,8 @@ Steps, one commit each, failure modes written as red tests first:
       `src/render/roads.ts`, `src/render/terrain.ts`). Models for the nine buildings, dirt paths,
       boulders on rock, the camp fire glowing at night. Check: `npm run peek`, day and night, each
       palette.
-- [ ] 11. `feat: walkers on the paths` (`src/render/walkers.ts`, `src/game.ts`). Check: `npm run
-    peek` at noon and midnight.
+- [ ] 11. `feat: walkers on the paths` (`src/render/walkers.ts`, `src/game.ts`). Check: `npm run peek` at noon
+      and midnight.
 - [ ] 12. `test: a Forager start in the browser` (`e2e/forager.spec.ts`): boots `?age=forager`,
       founds the camp, lays a path, builds a gathering hut by forest, sees the first arrival and the
       hut's first worker, screenshot to `e2e/screenshots/forager.png`. Check: `npm run e2e`.
