@@ -1,5 +1,6 @@
 import type { CameraPose } from './render/camera';
-import type { PaletteName } from './render/palette';
+import { type PaletteName, isPaletteName } from './render/palette';
+import { isDifficulty } from './sim/difficulty';
 import { TILE_COUNT } from './sim/grid';
 import type { SimSnapshot } from './sim/save';
 
@@ -26,6 +27,7 @@ export function readSave(): SaveFile | undefined {
     if (!raw) return undefined;
     const file = JSON.parse(raw) as Partial<SaveFile>;
     if (file.version !== 1 || file.sim?.terrain.length !== TILE_COUNT) return undefined;
+    if (!isDifficulty(file.sim.difficulty) || !isPaletteName(file.palette ?? '')) return undefined;
     return file as SaveFile;
   } catch {
     return undefined;

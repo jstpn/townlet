@@ -17,7 +17,7 @@ import type { Difficulty } from './sim/difficulty';
 import { type SaveFile, clearSave, writeSave } from './save';
 import type { Point } from './sim/grid';
 import { restoreSim, snapshot } from './sim/save';
-import { DAYS_PER_MONTH, Sim } from './sim/sim';
+import { Sim } from './sim/sim';
 
 const DAY_SECONDS = 0.5;
 
@@ -51,17 +51,18 @@ export class Game {
   speed = 1;
   private dayClock = 0;
   private previewRev = -1;
-  private savedCommands = 0;
+  private savedRev = 0;
   /** Called after each frame's simulation and before the render, for the HUD. */
   onFrame: (() => void) | undefined;
 
-  constructor(canvas: HTMLCanvasElement, options: GameOptions, saved?: SaveFile) {
-    this.palette = PALETTES[options.palette];
-    this.sim = saved
-      ? restoreSim(saved.sim)
-      : new Sim({ seed: options.seed, difficulty: options.difficulty });
+  constructor(canvas: HTMLCanvasElement, start: GameOptions | SaveFile) {
+    this.palette = PALETTES[start.palette];
+    this.sim =
+      'sim' in start
+        ? restoreSim(start.sim)
+        : new Sim({ seed: start.seed, difficulty: start.difficulty });
     this.gfx = new GameRenderer(canvas, this.palette);
-    if (saved) this.gfx.rig.setPose(saved.camera);
+    if ('sim' in start) this.gfx.rig.setPose(start.camera);
     for (const layer of this.layers) this.gfx.scene.add(layer.object);
     this.gfx.scene.add(this.cursor.object, this.ring.object);
     this.pointer = new Pointer(canvas);
@@ -99,7 +100,7 @@ export class Game {
   save(): void {
     if (this.sim.state.status === 'lost') clearSave();
     else writeSave({ version: 1, sim: snapshot(this.sim), palette: this.palette.name, camera: this.gfx.rig.pose() });
-    this.savedCommands = this.tool.commands;
+    this.savedRev = this.sim.state.rev.save;
   }
 
   dispose(): void {
@@ -113,8 +114,8 @@ export class Game {
     this.controls.update(dt);
     this.gfx.rig.update(dt);
     this.tool.update();
-    if (this.tool.commands !== this.savedCommands) this.save();
     this.tick(dt);
+    if (this.sim.state.rev.save !== this.savedRev) this.save();
     for (const layer of this.layers) layer.animate?.(dt);
     this.onFrame?.();
     this.syncLayers();
@@ -127,7 +128,6 @@ export class Game {
     for (let n = 0; this.dayClock >= DAY_SECONDS && n < 4; n++) {
       this.dayClock -= DAY_SECONDS;
       this.sim.step();
-      if (this.sim.state.day % DAYS_PER_MONTH === 0) this.save();
     }
     if (this.dayClock > DAY_SECONDS) this.dayClock = 0;
   }

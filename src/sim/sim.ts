@@ -99,8 +99,11 @@ export type SimState = {
   status: GameStatus;
   /** Milestones already announced, so each shows once. */
   announced: Set<string>;
-  /** Bumped whenever the matching layer changes, so renderers know what to rebuild. */
-  rev: { terrain: number; roads: number; zones: number; buildings: number; fire: number };
+  /**
+   * Bumped whenever the matching layer changes, so renderers know what to rebuild. `save` counts
+   * the moments worth an autosave: a command, a tax change, a month settled.
+   */
+  rev: { terrain: number; roads: number; zones: number; buildings: number; fire: number; save: number };
 };
 
 /** The whole town simulation: state plus the commands that change it. Deterministic, no DOM. */
@@ -142,7 +145,7 @@ export class Sim {
       budget: { income: 0, expenses: 0, taxes: { 1: 0, 2: 0, 3: 0 }, upkeep: {} },
       status: 'playing',
       announced: new Set(),
-      rev: { terrain: 0, roads: 0, zones: 0, buildings: 0, fire: 0 },
+      rev: { terrain: 0, roads: 0, zones: 0, buildings: 0, fire: 0, save: 0 },
     };
   }
 
@@ -165,6 +168,7 @@ export class Sim {
     if (s.day % DAYS_PER_MONTH === 0) {
       s.budget = settleMonth(s, settings);
       s.money += s.budget.income - s.budget.expenses;
+      s.rev.save++;
       const started = monthlyFire(s, fields, this.rng, settings);
       if (started !== undefined) this.events.push({ kind: 'fire', x: xOf(started), y: yOf(started) });
     }
@@ -189,20 +193,15 @@ export class Sim {
 
   /** Fire spreads, counts down and razes what burnt out. */
   private burn(fields: Fields): void {
-    const { burnt, changed } = stepFire(this.state, fields, this.rng);
-    if (changed) this.state.rev.fire++;
-    for (const tile of burnt) {
+    for (const tile of stepFire(this.state, fields, this.rng)) {
       if (this.state.buildingId[tile] !== -1) this.removeBuilding(tile);
-      else if (this.state.level[tile] > 0) {
-        this.state.level[tile] = 0;
-        this.state.occupancy[tile] = 0;
-        this.state.rev.zones++;
-      }
+      else this.razeLot(tile);
     }
   }
 
   setTaxRate(rate: number): void {
     this.state.taxRate = clamp(Math.round(rate), 0, MAX_TAX_RATE);
+    this.state.rev.save++;
   }
 
   /** Returns and clears the events raised since the last call. */
@@ -419,6 +418,7 @@ export class Sim {
     for (const t of plan.tiles) {
       if (t.status === 'change' && inBounds(t.x, t.y)) apply(idx(t.x, t.y));
     }
+    this.state.rev.save++;
     return { ok: true, cost: plan.cost };
   }
 
@@ -437,6 +437,11 @@ export class Sim {
   private setZone(tile: number, zone: Zone): void {
     if (this.state.zone[tile] === zone) return;
     this.state.zone[tile] = zone;
+    this.razeLot(tile);
+  }
+
+  /** Back to an empty lot of the same zone. */
+  private razeLot(tile: number): void {
     this.state.level[tile] = 0;
     this.state.occupancy[tile] = 0;
     this.state.rev.zones++;

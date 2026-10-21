@@ -3,6 +3,7 @@ import { xOf, yOf } from '../sim/grid';
 import type { SimState } from '../sim/sim';
 import { GeometryBuilder } from './geometryBuilder';
 import { tileHash } from './hash';
+import { uploadInstances } from './instanced';
 import type { Layer } from './layer';
 import type { Palette } from './palette';
 
@@ -73,7 +74,7 @@ export class FireLayer implements Layer {
         const phase = tileHash(x, y, 20 + i) * 6.28;
         const flicker = 0.75 + 0.25 * Math.sin(this.time * 9 + phase) * Math.cos(this.time * 5.3 + phase);
         this.p.set(x + 0.25 + 0.5 * tileHash(x, y, 30 + i), 0.4, y + 0.25 + 0.5 * tileHash(x, y, 40 + i));
-        this.q.setFromAxisAngle(UP, phase + this.time * 0.6);
+        this.q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, phase + this.time * 0.6);
         this.s.set(1.6 + 0.6 * flicker, 1.2 + 1.8 * flicker, 1.6 + 0.6 * flicker);
         this.flames.setMatrixAt(f++, this.m.compose(this.p, this.q, this.s));
       }
@@ -87,12 +88,10 @@ export class FireLayer implements Layer {
         this.smoke.setMatrixAt(k++, this.m.compose(this.p, this.q, this.s));
       }
     }
-    upload(this.flames, f);
-    upload(this.smoke, k);
+    uploadInstances(this.flames, f);
+    uploadInstances(this.smoke, k);
   }
 }
-
-const UP = new THREE.Vector3(0, 1, 0);
 
 /** Two crossed tongues, each a wide base tapering to a point, warm at the heart and red at the tips. */
 function flameGeometry(): THREE.BufferGeometry {
@@ -106,11 +105,4 @@ function flameGeometry(): THREE.BufferGeometry {
     g.tri(-c * 0.5, 0.05, -s * 0.5, c * 0.5, 0.05, s * 0.5, 0, 0.32, 0, core);
   }
   return g.build();
-}
-
-function upload(mesh: THREE.InstancedMesh, count: number): void {
-  mesh.count = count;
-  mesh.instanceMatrix.clearUpdateRanges();
-  mesh.instanceMatrix.addUpdateRange(0, count * 16);
-  mesh.instanceMatrix.needsUpdate = true;
 }

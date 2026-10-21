@@ -1,21 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { idx } from '../src/sim/grid';
 import { Sim } from '../src/sim/sim';
 import { Terrain, Zone } from '../src/sim/types';
-import { days, flatTerrain, foundedSim } from './helpers';
+import { days, flatTerrain, foundedSim, fullLot } from './helpers';
 
 const town = (difficulty: 'easy' | 'normal' | 'hard' = 'normal'): Sim => {
   const sim = foundedSim({ difficulty });
   sim.placeRoadLine(26, 33, 30, 33);
   return sim;
-};
-
-/** A full residential lot at the given level, placed directly. */
-const fullLot = (sim: Sim, x: number, y: number, zone: Zone, level: number): void => {
-  sim.state.zone[idx(x, y)] = zone;
-  sim.state.level[idx(x, y)] = level;
-  sim.state.occupancy[idx(x, y)] = 1;
-  sim.state.rev.zones++;
 };
 
 describe('monthly budget', () => {

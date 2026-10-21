@@ -5,12 +5,6 @@ import type { Rng } from './rng';
 import type { SimState } from './sim';
 import { Zone } from './types';
 
-export type FireOutcome = {
-  /** Tiles whose lot or building burnt down this step. */
-  burnt: number[];
-  changed: boolean;
-};
-
 /** A developed lot or a service other than the town hall, and not already burning. */
 export function flammable(state: SimState, tile: number): boolean {
   if (state.fire[tile] > 0) return false;
@@ -38,14 +32,13 @@ export function monthlyFire(
   const candidates: number[] = [];
   for (let tile = 0; tile < TILE_COUNT; tile++) if (flammable(state, tile)) candidates.push(tile);
   const tile = candidates[rng.int(candidates.length)];
-  if (tile === undefined || !ignite(state, fields, tile)) return undefined;
+  if (tile !== undefined) ignite(state, fields, tile);
   return tile;
 }
 
-/** One day of burning: spread to neighbours, count down, and raze what has burnt out. */
-export function stepFire(state: SimState, fields: Fields, rng: Rng): FireOutcome {
+/** One day of burning: spread to neighbours and count down. Returns the tiles that burnt out. */
+export function stepFire(state: SimState, fields: Fields, rng: Rng): number[] {
   const burnt: number[] = [];
-  let changed = false;
   const spreading: number[] = [];
   for (let tile = 0; tile < TILE_COUNT; tile++) if (state.fire[tile] > 0) spreading.push(tile);
   for (const tile of spreading) {
@@ -54,17 +47,15 @@ export function stepFire(state: SimState, fields: Fields, rng: Rng): FireOutcome
     for (const [dx, dy] of DIRS4) {
       if (!inBounds(x + dx, y + dy)) continue;
       const next = idx(x + dx, y + dy);
-      if (!flammable(state, next)) continue;
-      if (rng.chance(fields.coverage.fire[next] ? 0.05 : 0.2)) {
-        state.fire[next] = fields.coverage.fire[next] ? 3 : 10;
-        changed = true;
+      if (flammable(state, next) && rng.chance(fields.coverage.fire[next] ? 0.05 : 0.2)) {
+        ignite(state, fields, next);
       }
     }
   }
   for (const tile of spreading) {
     state.fire[tile]--;
-    changed = true;
     if (state.fire[tile] === 0) burnt.push(tile);
   }
-  return { burnt, changed };
+  if (spreading.length > 0) state.rev.fire++;
+  return burnt;
 }

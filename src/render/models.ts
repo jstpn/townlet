@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GeometryBuilder } from './geometryBuilder';
 
 /** Which palette colour a model part takes. Walls and roofs vary per building. */
-export type Role = 'wall' | 'roof' | 'trim' | 'foliage' | 'trunk' | 'dark' | 'accent' | 'glass';
+export type Role = 'wall' | 'roof' | 'trim' | 'foliage' | 'trunk' | 'dark' | 'accent';
 
 /** A window slot in model space: position and outward normal. */
 export type WindowSlot = { x: number; y: number; z: number; nx: number; nz: number };
@@ -13,29 +13,7 @@ export type Model = {
   windows: WindowSlot[];
 };
 
-export const MODEL_KEYS = [
-  'res1',
-  'res2',
-  'res3',
-  'com1',
-  'com2',
-  'com3',
-  'ind1',
-  'ind2',
-  'ind3',
-  'townHall',
-  'windTurbine',
-  'turbineBlades',
-  'waterTower',
-  'park',
-  'school',
-  'clinic',
-  'fireStation',
-  'policeStation',
-  'tree',
-  'plaza',
-] as const;
-export type ModelKey = (typeof MODEL_KEYS)[number];
+export type ModelKey = keyof ReturnType<typeof buildModels>;
 
 const WHITE = new THREE.Color('#ffffff');
 const TAU = Math.PI * 2;
@@ -212,7 +190,8 @@ function define(size: 1 | 2, draw: (m: ModelBuilder) => void): Model {
   return m.build();
 }
 
-export function buildModels(): Record<ModelKey, Model> {
+/** Every model, built fresh. The literal's keys define `ModelKey`. */
+export function buildModels() {
   return {
     res1: define(1, (m) => {
       m.box('wall', 0.22, 0, 0.22, 0.78, 0.36, 0.78)

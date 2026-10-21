@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MAP_SIZE, idx } from '../sim/grid';
 import { Terrain } from '../sim/types';
 import { tileHash } from './hash';
+import { uploadInstances } from './instanced';
 import type { Palette } from './palette';
 
 const CAPACITY = 7000;
@@ -83,16 +84,6 @@ export class TreeLayer {
       }
     }
 
-    for (const mesh of [this.trunks, this.lower, this.upper]) {
-      mesh.count = n;
-      mesh.instanceMatrix.clearUpdateRanges();
-      mesh.instanceMatrix.addUpdateRange(0, n * 16);
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) {
-        mesh.instanceColor.clearUpdateRanges();
-        mesh.instanceColor.addUpdateRange(0, n * 3);
-        mesh.instanceColor.needsUpdate = true;
-      }
-    }
+    for (const mesh of [this.trunks, this.lower, this.upper]) uploadInstances(mesh, n);
   }
 }

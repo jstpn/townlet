@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { footprint } from '../sim/catalogue';
-import { DIRS4, TILE_COUNT, idx, inBounds, roadPath, xOf, yOf } from '../sim/grid';
+import { DIRS4, TILE_COUNT, idx, inBounds, labelRegions, roadPath, xOf, yOf } from '../sim/grid';
 import type { SimState } from '../sim/sim';
 import { Zone } from '../sim/types';
 import { GeometryBuilder } from './geometryBuilder';
+import { uploadInstances } from './instanced';
 import type { Layer } from './layer';
 import type { Palette } from './palette';
 
@@ -19,8 +20,11 @@ type Car = { path: number[]; dist: number; speed: number; color: number };
 export class CarLayer implements Layer {
   readonly object: THREE.InstancedMesh;
   private cars: Car[] = [];
+  /** Road tiles beside a home whose road network also reaches a job, so every route exists. */
   private homes: number[] = [];
-  private jobs: number[] = [];
+  /** Road tiles beside a job, grouped by road network. */
+  private jobsByNetwork: number[][] = [];
+  private network: Int32Array = new Int32Array(0);
   private road: Uint8Array = new Uint8Array(0);
   private target = 0;
   private colors: THREE.Color[] = [];
@@ -64,9 +68,7 @@ export class CarLayer implements Layer {
       return car.dist < car.path.length - 1;
     });
     this.cars.forEach((car, i) => this.place(car, i));
-    this.object.count = this.cars.length;
-    this.object.instanceMatrix.needsUpdate = true;
-    if (this.object.instanceColor) this.object.instanceColor.needsUpdate = true;
+    uploadInstances(this.object, this.cars.length);
   }
 
   private collectEndpoints(state: SimState): void {
@@ -78,8 +80,10 @@ export class CarLayer implements Layer {
       else job[tile] = 1;
     }
     for (const b of state.buildings.values()) for (const tile of footprint(b)) job[tile] = 1;
-    this.homes = [];
-    this.jobs = [];
+    const { label, sizes } = labelRegions((tile) => state.road[tile] === 1);
+    this.network = label;
+    this.jobsByNetwork = sizes.map(() => []);
+    const homes: number[] = [];
     for (let tile = 0; tile < TILE_COUNT; tile++) {
       if (state.road[tile] === 0) continue;
       const x = xOf(tile);
@@ -92,16 +96,18 @@ export class CarLayer implements Layer {
         nearHome ||= home[next] === 1;
         nearJob ||= job[next] === 1;
       }
-      if (nearHome) this.homes.push(tile);
-      if (nearJob) this.jobs.push(tile);
+      if (nearHome) homes.push(tile);
+      if (nearJob) this.jobsByNetwork[label[tile]]?.push(tile);
     }
+    this.homes = homes.filter((tile) => this.jobsByNetwork[label[tile]]?.length);
   }
 
   private spawn(): void {
-    if (this.homes.length === 0 || this.jobs.length === 0 || this.colors.length === 0) return;
+    if (this.homes.length === 0 || this.colors.length === 0) return;
     const from = pick(this.homes);
-    const to = pick(this.jobs);
-    const path = roadPath(this.road, from, to);
+    const jobs = this.jobsByNetwork[this.network[from]];
+    if (!jobs) return;
+    const path = roadPath(this.road, from, pick(jobs));
     if (!path || path.length < 2) return;
     if (Math.random() < 0.5) path.reverse();
     const color = Math.floor(Math.random() * this.colors.length);
@@ -127,13 +133,11 @@ export class CarLayer implements Layer {
       dz /= len;
     }
     this.p.set(xOf(a) + 0.5 + (xOf(b) - xOf(a)) * u + dz * LANE, 0.06, yOf(a) + 0.5 + (yOf(b) - yOf(a)) * u - dx * LANE);
-    this.q.setFromAxisAngle(UP, Math.atan2(-dz, dx));
+    this.q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, Math.atan2(-dz, dx));
     this.object.setMatrixAt(index, this.m.compose(this.p, this.q, this.s));
     this.object.setColorAt(index, this.colors[car.color]);
   }
 }
-
-const UP = new THREE.Vector3(0, 1, 0);
 
 const pick = <T>(list: T[]): T => list[Math.floor(Math.random() * list.length)];
 

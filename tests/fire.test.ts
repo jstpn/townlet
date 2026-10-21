@@ -2,18 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { idx } from '../src/sim/grid';
 import type { Sim } from '../src/sim/sim';
 import { Zone } from '../src/sim/types';
-import { days, foundedSim } from './helpers';
+import { days, foundedSim, fullLot } from './helpers';
 
-/** A served block of developed homes along a road, inside the town hall's cover. */
+/** A block of full homes, placed directly. */
 const block = (sim: Sim, x0: number, y0: number, x1: number, y1: number): void => {
-  sim.zoneRect(Zone.Residential, x0, y0, x1, y1);
   for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      sim.state.level[idx(x, y)] = 2;
-      sim.state.occupancy[idx(x, y)] = 1;
-    }
+    for (let x = x0; x <= x1; x++) fullLot(sim, x, y, Zone.Residential, 2);
   }
-  sim.state.rev.zones++;
 };
 
 describe('fire', () => {

@@ -303,7 +303,6 @@ export class Hud {
       rows.push(['Upkeep', `${num(def.upkeep)} a month`]);
       if (def.radius > 0) rows.push(['Reach', `${def.radius} tiles`]);
       if (def.jobs > 0) rows.push(['Jobs', `${def.jobs}`]);
-      if (s.fire[t] > 0) rows.push(['On fire', `${s.fire[t]} days left`]);
       if (selectionChanged) {
         this.game.highlight(footprint(b, def.radius).map((tt) => ({ x: xOf(tt), y: yOf(tt) })));
       }
@@ -322,9 +321,9 @@ export class Hud {
         if (!fields.coverage.water[t]) warnings.push('no water');
         if (fields.pollution[t] > 0) warnings.push('smoke');
         if (warnings.length) rows.push(['Needs', warnings.join(', ')]);
-        if (s.fire[t] > 0) rows.push(['On fire', `${s.fire[t]} days left`]);
       } else if (s.road[t]) title = 'Road';
     }
+    if (s.fire[t] > 0) rows.push(['On fire', `${s.fire[t]} days left`]);
     this.info.append(
       el('h2', {}, title),
       el('p.muted', {}, `${tile.x}, ${tile.y}`),

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { TILE_COUNT } from '../sim/grid';
 import type { Point } from '../sim/grid';
 import type { PlanStatus } from '../sim/sim';
+import { uploadInstances } from './instanced';
 
 export type PreviewTint = 'build' | 'remove' | 'ring';
 
@@ -40,15 +41,7 @@ export class CursorLayer {
       this.object.setColorAt(n, color);
       n++;
     }
-    this.object.count = n;
-    this.object.instanceMatrix.clearUpdateRanges();
-    this.object.instanceMatrix.addUpdateRange(0, n * 16);
-    this.object.instanceMatrix.needsUpdate = true;
-    if (this.object.instanceColor) {
-      this.object.instanceColor.clearUpdateRanges();
-      this.object.instanceColor.addUpdateRange(0, n * 3);
-      this.object.instanceColor.needsUpdate = true;
-    }
+    uploadInstances(this.object, n);
   }
 
   clear(): void {

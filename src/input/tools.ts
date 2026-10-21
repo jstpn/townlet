@@ -28,8 +28,6 @@ export class BuildTool {
   selected: Point | undefined;
   /** Called with the outcome of every committed gesture. */
   onCommand: ((result: CommandResult) => void) | undefined;
-  /** Successful commands so far, so the game knows when there is something new to save. */
-  commands = 0;
   private start: Point | undefined;
   private hover: Point | undefined;
 
@@ -95,7 +93,6 @@ export class BuildTool {
       case 'none':
         return;
     }
-    if (result.ok) this.commands++;
     this.onCommand?.(result);
   }
 

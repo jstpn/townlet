@@ -32,21 +32,14 @@ const defaults: Partial<GameOptions> = {
 };
 
 async function run(initial: Partial<GameOptions>): Promise<void> {
-  const saved = readSave();
-  const choice = await showStartScreen(hudRoot, initial, saved !== undefined);
-  const options: GameOptions =
-    choice === 'continue' && saved
-      ? { seed: saved.sim.seed, difficulty: saved.sim.difficulty, palette: saved.palette }
-      : choice === 'continue'
-        ? { seed: '', difficulty: 'normal', palette: 'budapest' }
-        : choice;
-  const game = new Game(canvas, options, choice === 'continue' ? saved : undefined);
+  const start = await showStartScreen(hudRoot, initial, readSave());
+  const game = new Game(canvas, start);
   const hud = new Hud(hudRoot, game, {
     onNewTown: () => {
       hud.dispose();
       game.dispose();
       clearSave();
-      void run({ ...options, seed: undefined });
+      void run({ difficulty: game.sim.state.difficulty, palette: game.paletteName });
     },
   });
   game.onFrame = () => hud.update();

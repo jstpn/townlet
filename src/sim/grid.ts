@@ -73,14 +73,23 @@ export function rectTiles(x0: number, y0: number, x1: number, y1: number): numbe
 
 /** Size of the largest 4-connected set of tiles for which `passable` holds. */
 export function largestRegionSize(passable: (tile: number) => boolean): number {
-  const seen = new Uint8Array(TILE_COUNT);
+  return Math.max(0, ...labelRegions(passable).sizes);
+}
+
+/** Numbers every 4-connected region of passable tiles; `label` is -1 elsewhere. */
+export function labelRegions(passable: (tile: number) => boolean): {
+  label: Int32Array;
+  sizes: number[];
+} {
+  const label = new Int32Array(TILE_COUNT).fill(-1);
+  const sizes: number[] = [];
   const stack: number[] = [];
-  let best = 0;
   for (let start = 0; start < TILE_COUNT; start++) {
-    if (seen[start] || !passable(start)) continue;
+    if (label[start] !== -1 || !passable(start)) continue;
+    const region = sizes.length;
     let size = 0;
     stack.push(start);
-    seen[start] = 1;
+    label[start] = region;
     for (let tile = stack.pop(); tile !== undefined; tile = stack.pop()) {
       size++;
       const x = xOf(tile);
@@ -90,14 +99,14 @@ export function largestRegionSize(passable: (tile: number) => boolean): number {
         const ny = y + dy;
         if (!inBounds(nx, ny)) continue;
         const next = idx(nx, ny);
-        if (seen[next] || !passable(next)) continue;
-        seen[next] = 1;
+        if (label[next] !== -1 || !passable(next)) continue;
+        label[next] = region;
         stack.push(next);
       }
     }
-    best = Math.max(best, size);
+    sizes.push(size);
   }
-  return best;
+  return { label, sizes };
 }
 
 export const UNREACHABLE = 0xffff;
@@ -133,9 +142,10 @@ export function distanceField(isSource: (tile: number) => boolean): Uint16Array 
 export const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
 /** Shortest route along road tiles from one road tile to another, inclusive, or undefined when disconnected. */
+const cameFrom = new Int32Array(TILE_COUNT);
 export function roadPath(road: Uint8Array, from: number, to: number): number[] | undefined {
   if (road[from] === 0 || road[to] === 0) return undefined;
-  const cameFrom = new Int32Array(TILE_COUNT).fill(-1);
+  cameFrom.fill(-1);
   cameFrom[from] = from;
   const queue = [from];
   // Pushing while iterating is deliberate: the array is the BFS queue.
