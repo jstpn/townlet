@@ -21,7 +21,7 @@ Spec: tasks/spec.md. Tick as you go. Review rounds after every 3 or 4 code commi
 - [x] Review round C
 - [x] 13. Post-processing, day and night polish, postcard
 - [x] 14. Balance pass with the autoplayer test
-- [ ] 15. Playwright smoke, README with screenshots
+- [x] 15. Playwright smoke, README with screenshots
 - [ ] Review round D
 
 ## Stretch, in order

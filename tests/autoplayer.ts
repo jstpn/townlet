@@ -74,7 +74,8 @@ function foundTown(sim: Sim): { x: number; y: number } | undefined {
   return undefined;
 }
 
-const dist = (tile: number, c: number): number => Math.hypot(xOf(tile) - c + 0.5, yOf(tile) - c + 0.5);
+const dist = (tile: number, c: number): number =>
+  Math.hypot(xOf(tile) - c + 0.5, yOf(tile) - c + 0.5);
 
 /** One month of mayoring within `radius` tiles of the hall. */
 function expand(sim: Sim, hall: { x: number; y: number }, radius: number): void {
