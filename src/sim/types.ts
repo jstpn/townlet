@@ -14,3 +14,4 @@ export const Zone = {
 } as const;
 export type Zone = (typeof Zone)[keyof typeof Zone];
 export type ZoneKind = Exclude<Zone, typeof Zone.None>;
+export const ZONE_KINDS = [Zone.Residential, Zone.Commercial, Zone.Industrial] as const;

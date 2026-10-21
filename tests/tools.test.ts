@@ -4,14 +4,12 @@ import { BuildTool } from '../src/input/tools';
 import type { CameraRig } from '../src/render/camera';
 import type { Point } from '../src/sim/grid';
 import { idx } from '../src/sim/grid';
-import { Sim } from '../src/sim/sim';
-import { Terrain, Zone } from '../src/sim/types';
-import { flatTerrain } from './helpers';
+import { Zone } from '../src/sim/types';
+import { foundedSim } from './helpers';
 
 /** Drives a BuildTool with a fake pointer and a camera that reports whatever tile we say. */
 function harness() {
-  const sim = new Sim({ seed: 't', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
-  sim.placeBuilding('townHall', 30, 30);
+  const sim = foundedSim();
   let under: Point | undefined;
   const handlers = {
     down: [] as ((b: number) => void)[],

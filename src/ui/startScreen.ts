@@ -1,7 +1,8 @@
 import type { GameOptions } from '../game';
-import { PALETTES, PALETTE_NAMES, type PaletteName } from '../render/palette';
+import { PALETTE_NAMES, type PaletteName } from '../render/palette';
 import { DIFFICULTIES, DIFFICULTY, type Difficulty } from '../sim/difficulty';
-import { clear, el, input } from './dom';
+import { clear, el } from './dom';
+import { paletteSwatch } from './swatch';
 
 const WORDS = [
   'budapest',
@@ -26,18 +27,15 @@ const randomSeed = (): string => {
   return `${pick()}-${pick()}-${Math.floor(Math.random() * 1000)}`;
 };
 
-export type StartChoice = { kind: 'new'; options: GameOptions } | { kind: 'continue' };
-
-/** The title screen. Resolves once the player founds a town or continues the saved one. */
+/** The title screen. Resolves once the player founds a town. */
 export function showStartScreen(
   root: HTMLElement,
   defaults: Partial<GameOptions>,
-  canContinue: boolean,
-): Promise<StartChoice> {
+): Promise<GameOptions> {
   return new Promise((resolve) => {
     let difficulty: Difficulty = defaults.difficulty ?? 'normal';
     let palette: PaletteName = defaults.palette ?? 'budapest';
-    const seed = input('seed', {
+    const seed = el<HTMLInputElement>('input.seed', {
       type: 'text',
       value: defaults.seed ?? randomSeed(),
       spellcheck: 'false',
@@ -52,34 +50,24 @@ export function showStartScreen(
         difficultyRow.append(
           el(
             `button.choice${name === difficulty ? '.active' : ''}`,
-            { type: 'button', onclick: () => ((difficulty = name), renderChoices()) },
+            { onclick: () => ((difficulty = name), renderChoices()) },
             DIFFICULTY[name].label,
           ),
         );
       }
       clear(paletteRow);
       for (const name of PALETTE_NAMES) {
-        const p = PALETTES[name];
-        const swatch = el(
-          `button.swatch${name === palette ? '.active' : ''}`,
-          { type: 'button', title: p.label, onclick: () => ((palette = name), renderChoices()) },
-          el('span.swatch-row', {}, ...[p.grass, p.walls[0], p.roofs[1], p.waterDeep].map(dot)),
-          el('span.swatch-label', {}, p.label),
+        paletteRow.append(
+          paletteSwatch(name, name === palette, () => ((palette = name), renderChoices())),
         );
-        paletteRow.append(swatch);
       }
     };
     renderChoices();
 
-    const finish = (choice: StartChoice): void => {
+    const found = (): void => {
       screen.remove();
-      resolve(choice);
+      resolve({ seed: seed.value.trim() || randomSeed(), difficulty, palette });
     };
-    const found = (): void =>
-      finish({
-        kind: 'new',
-        options: { seed: seed.value.trim() || randomSeed(), difficulty, palette },
-      });
 
     const screen = el(
       'div.start',
@@ -98,16 +86,10 @@ export function showStartScreen(
             'div.seed-row',
             {},
             seed,
-            el('button.ghost', { type: 'button', onclick: () => (seed.value = randomSeed()) }, 'Randomise'),
+            el('button.ghost', { onclick: () => (seed.value = randomSeed()) }, 'Randomise'),
           ),
         ),
-        el(
-          'div.start-actions',
-          {},
-          el('button.primary', { type: 'button', onclick: found }, 'Found the town'),
-          canContinue &&
-            el('button.ghost', { type: 'button', onclick: () => finish({ kind: 'continue' }) }, 'Continue'),
-        ),
+        el('div.start-actions', {}, el('button.primary', { onclick: found }, 'Found the town')),
       ),
     );
     seed.addEventListener('keydown', (e) => {
@@ -116,8 +98,6 @@ export function showStartScreen(
     root.append(screen);
   });
 }
-
-const dot = (hex: string): HTMLElement => el('i.dot', { style: `background:${hex}` });
 
 const field = (label: string, control: HTMLElement): HTMLElement =>
   el('label.field', {}, el('span.field-label', {}, label), control);

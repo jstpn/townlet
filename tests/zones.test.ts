@@ -2,14 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { idx } from '../src/sim/grid';
 import { Sim } from '../src/sim/sim';
 import { Terrain, Zone } from '../src/sim/types';
-import { flatTerrain } from './helpers';
+import { flatTerrain, foundedSim } from './helpers';
 
-/** A town with its hall already founded at (30, 30), so other commands are allowed. */
-const founded = (terrain = flatTerrain(Terrain.Grass)): Sim => {
-  const sim = new Sim({ seed: 'test', difficulty: 'normal', terrain });
-  sim.placeBuilding('townHall', 30, 30);
-  return sim;
-};
+const founded = (terrain?: Uint8Array): Sim => foundedSim({ terrain });
 
 describe('zoning', () => {
   it('paints a rectangle of residential zone and charges per tile', () => {

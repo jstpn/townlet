@@ -1,19 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { idx } from '../src/sim/grid';
-import { Sim } from '../src/sim/sim';
-import { Terrain, Zone } from '../src/sim/types';
-import { flatTerrain } from './helpers';
+import type { Sim } from '../src/sim/sim';
+import { Zone } from '../src/sim/types';
+import { days, foundedSim } from './helpers';
 
 /** A town hall at (30, 30) and a road along y = 33, so lots beside it are served and reachable. */
 const town = (): Sim => {
-  const sim = new Sim({ seed: 'test', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
-  sim.placeBuilding('townHall', 30, 30);
+  const sim = foundedSim();
   sim.placeRoadLine(26, 33, 35, 33);
   return sim;
-};
-
-const days = (sim: Sim, n: number): void => {
-  for (let i = 0; i < n; i++) sim.step();
 };
 
 describe('demand', () => {
@@ -21,9 +16,9 @@ describe('demand', () => {
     const sim = town();
     sim.step();
     expect(sim.state.day).toBe(1);
-    expect(sim.state.demand.residential).toBe(1);
-    expect(sim.state.demand.commercial).toBe(0);
-    expect(sim.state.demand.industrial).toBeCloseTo(0.15);
+    expect(sim.state.demand[Zone.Residential]).toBe(1);
+    expect(sim.state.demand[Zone.Commercial]).toBe(0);
+    expect(sim.state.demand[Zone.Industrial]).toBeCloseTo(0.15);
     expect(sim.state.population).toBe(0);
     expect(sim.state.jobs).toBe(20);
   });

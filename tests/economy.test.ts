@@ -2,17 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { idx } from '../src/sim/grid';
 import { Sim } from '../src/sim/sim';
 import { Terrain, Zone } from '../src/sim/types';
-import { flatTerrain } from './helpers';
+import { days, flatTerrain, foundedSim } from './helpers';
 
-const town = (difficulty: 'easy' | 'normal' | 'hard' = 'normal', money?: number): Sim => {
-  const sim = new Sim({ seed: 'test', difficulty, terrain: flatTerrain(Terrain.Grass), money });
-  sim.placeBuilding('townHall', 30, 30);
+const town = (difficulty: 'easy' | 'normal' | 'hard' = 'normal'): Sim => {
+  const sim = foundedSim({ difficulty });
   sim.placeRoadLine(26, 33, 30, 33);
   return sim;
-};
-
-const days = (sim: Sim, n: number): void => {
-  for (let i = 0; i < n; i++) sim.step();
 };
 
 /** A full residential lot at the given level, placed directly. */
@@ -123,8 +118,7 @@ describe('before founding', () => {
 
 describe('milestones', () => {
   it('announces founding, the first of each service and population marks', () => {
-    const sim = new Sim({ seed: 'test', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
-    sim.placeBuilding('townHall', 30, 30);
+    const sim = foundedSim();
     expect(sim.takeEvents()).toEqual([{ kind: 'founded' }]);
     sim.placeBuilding('park', 10, 10);
     sim.placeBuilding('park', 12, 12);

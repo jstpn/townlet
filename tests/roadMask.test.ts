@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ROAD_E, ROAD_N, ROAD_S, ROAD_W, roadConnections } from '../src/render/roadMask';
-import { Sim } from '../src/sim/sim';
-import { Terrain } from '../src/sim/types';
-import { flatTerrain } from './helpers';
+import { foundedSim } from './helpers';
 
 describe('roadConnections', () => {
   it('reports which neighbours a road tile joins, as N E S W bits', () => {
-    const sim = new Sim({ seed: 't', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
-    sim.placeBuilding('townHall', 30, 30);
+    const sim = foundedSim();
     sim.placeRoadLine(2, 5, 6, 5);
     sim.placeRoadLine(4, 5, 4, 7);
     const road = sim.state.road;

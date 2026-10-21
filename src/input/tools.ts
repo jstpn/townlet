@@ -24,9 +24,8 @@ export class BuildTool {
   preview: Preview | undefined;
   /** Bumped whenever `preview` changes, so the renderer can skip unchanged frames. */
   previewRev = 0;
-  /** Tile clicked with no tool active, for the info panel. */
+  /** Tile clicked with no tool active, for the info panel. A new object per click. */
   selected: Point | undefined;
-  selectionRev = 0;
   /** Called with the outcome of every committed gesture. */
   onCommand: ((result: CommandResult) => void) | undefined;
   private start: Point | undefined;
@@ -50,9 +49,7 @@ export class BuildTool {
   }
 
   select(tile: Point | undefined): void {
-    if (tile?.x === this.selected?.x && tile?.y === this.selected?.y) return;
     this.selected = tile;
-    this.selectionRev++;
   }
 
   /** Re-picks the tile under the pointer. Called on pointer moves and once per frame, since the camera can move too. */

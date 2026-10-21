@@ -1,23 +1,26 @@
 import type { Game } from '../game';
-import type { Tool } from '../input/tools';
 import { bindKeys } from '../input/keymap';
-import { PALETTES, PALETTE_NAMES, type PaletteName } from '../render/palette';
+import type { Tool } from '../input/tools';
+import { PALETTE_NAMES } from '../render/palette';
 import {
   BUILDINGS,
   BULLDOZE_COST,
   type BuildingKind,
   ROAD_COST,
   ZONE_COST,
+  footprint,
 } from '../sim/catalogue';
 import { DIFFICULTY } from '../sim/difficulty';
 import { desirability } from '../sim/growth';
-import { MAP_SIZE, idx, rectTiles } from '../sim/grid';
-import { type CommandError, type PlanTile, type SimEvent, MAX_TAX_RATE } from '../sim/sim';
-import { Terrain, Zone, type ZoneKind } from '../sim/types';
+import { idx, xOf, yOf } from '../sim/grid';
+import type { Budget } from '../sim/economy';
+import { type CommandError, type SimEvent, MAX_TAX_RATE } from '../sim/sim';
+import { Terrain, Zone, ZONE_KINDS, type ZoneKind } from '../sim/types';
 import { formatDate } from './calendar';
-import { clear, el, input, money } from './dom';
+import { clear, el, num } from './dom';
+import { paletteSwatch } from './swatch';
 
-type MenuItem = { label: string; cost: number; tool: Tool; key?: string };
+type MenuItem = { label: string; cost: number; tool: Tool };
 type Category = { label: string; items: MenuItem[] };
 
 const ZONE_LABEL: Record<ZoneKind, string> = {
@@ -54,59 +57,58 @@ const HINTS = [
   ['Then services', 'Power and water are required; schools, clinics and parks keep people happy.'],
 ] as const;
 
-const services: BuildingKind[] = [
-  'windTurbine',
-  'waterTower',
-  'school',
-  'clinic',
-  'fireStation',
-  'policeStation',
-];
 const building = (kind: BuildingKind): MenuItem => ({
   label: BUILDINGS[kind].label,
   cost: BUILDINGS[kind].cost,
   tool: { kind: 'building', building: kind },
 });
+const TOWN_HALL = building('townHall');
 
 const CATEGORIES: Category[] = [
   { label: 'Roads', items: [{ label: 'Road', cost: ROAD_COST, tool: { kind: 'road' } }] },
   {
     label: 'Zones',
-    items: ([Zone.Residential, Zone.Commercial, Zone.Industrial] as const).map((zone) => ({
+    items: ZONE_KINDS.map((zone) => ({
       label: ZONE_LABEL[zone],
       cost: ZONE_COST,
       tool: { kind: 'zone', zone },
     })),
   },
-  { label: 'Services', items: [building('townHall'), ...services.map(building)] },
-  { label: 'Decor', items: ['park', 'plaza', 'tree'].map((k) => building(k as BuildingKind)) },
+  {
+    label: 'Services',
+    items: [
+      TOWN_HALL,
+      ...(['windTurbine', 'waterTower', 'school', 'clinic', 'fireStation', 'policeStation'] as const).map(
+        building,
+      ),
+    ],
+  },
+  { label: 'Decor', items: (['park', 'plaza', 'tree'] as const).map(building) },
   { label: 'Bulldoze', items: [{ label: 'Bulldoze', cost: BULLDOZE_COST, tool: { kind: 'bulldoze' } }] },
 ];
 
 export type HudCallbacks = { onNewTown: () => void };
 
-/** All the paper-and-ink chrome around the map. Reads game state once per frame. */
+/** All the paper-and-ink chrome around the map. Built once; `update` derives it from game state. */
 export class Hud {
-  private readonly root: HTMLElement;
+  private readonly root = el('div.hud');
   private readonly stats = {
     money: el('span.stat-value'),
     population: el('span.stat-value'),
     happiness: el('span.stat-value'),
     date: el('span.date'),
-    demand: [el('i.bar'), el('i.bar'), el('i.bar')],
+    demand: ZONE_KINDS.map(() => el('i.bar')),
   };
   private readonly speedButtons: HTMLElement[] = [];
-  private readonly menu = el('nav.menu');
-  private readonly items = el('div.menu-items');
+  private readonly categoryButtons: HTMLElement[] = [];
+  private readonly itemPanels: { panel: HTMLElement; buttons: [MenuItem, HTMLElement][] }[] = [];
   private readonly info = el('aside.panel.info');
   private readonly budget = el('aside.panel.budget');
   private readonly toasts = el('div.toasts');
   private readonly overlay = el('div.overlay');
   private readonly hints = el('div.hints');
   private category = -1;
-  private selectionRev = -1;
-  private infoDay = -1;
-  private budgetOpen = false;
+  private shown = { day: -1, money: NaN, speed: -1, selected: undefined as unknown, budget: undefined as Budget | undefined };
   private paused = false;
   private pausedSpeed = 1;
   private hint = 0;
@@ -119,11 +121,9 @@ export class Hud {
     private readonly game: Game,
     private readonly callbacks: HudCallbacks,
   ) {
-    this.root = el('div.hud');
     root.append(this.root);
-    this.root.append(this.buildTopBar(), this.menu, this.items, this.info, this.budget, this.toasts);
+    this.root.append(this.buildTopBar(), this.buildMenu(), this.info, this.budget, this.toasts);
     this.root.append(this.hints, this.overlay);
-    this.renderMenu();
     this.showHint();
     this.budget.hidden = true;
     this.info.hidden = true;
@@ -137,32 +137,37 @@ export class Hud {
       '3': () => this.openCategory(2),
       '4': () => this.openCategory(3),
       '5': () => this.openCategory(4),
+      ' ': () => this.setSpeed(this.game.speed === 0 ? 1 : 0),
       escape: () => this.escape(),
     });
-    this.game.tool.setTool({ kind: 'none' });
+    // The first act of every game is placing the town hall, so start with it in hand.
+    if (!game.sim.state.founded) {
+      this.category = 2;
+      game.tool.setTool(TOWN_HALL.tool);
+    }
   }
 
-  /** Once per frame. */
+  /** Once per frame. Cheap when nothing changed. */
   update(): void {
     const s = this.game.sim.state;
-    this.stats.money.textContent = money(s.money);
-    this.stats.money.classList.toggle('negative', s.money < 0);
-    this.stats.population.textContent = Math.round(s.population).toLocaleString('en-GB');
-    this.stats.happiness.textContent = `${Math.round(s.happiness)}`;
-    this.stats.date.textContent = formatDate(s.day);
-    const demand = [s.demand.residential, s.demand.commercial, s.demand.industrial];
-    this.stats.demand.forEach((bar, i) => {
-      const d = demand[i] ?? 0;
-      bar.style.setProperty('--fill', `${Math.round(Math.abs(d) * 100)}%`);
-      bar.classList.toggle('negative', d < 0);
-    });
-    this.speedButtons.forEach((b, i) => b.classList.toggle('active', this.game.speed === i));
-    if (this.game.tool.selectionRev !== this.selectionRev || this.infoDay !== s.day) {
-      this.selectionRev = this.game.tool.selectionRev;
-      this.infoDay = s.day;
-      this.renderInfo();
+    const { shown } = this;
+    if (s.day !== shown.day || s.money !== shown.money) {
+      shown.day = s.day;
+      shown.money = s.money;
+      this.renderStats();
     }
-    if (this.budgetOpen && s.day % 30 === 0) this.renderBudget();
+    if (this.game.speed !== shown.speed) {
+      shown.speed = this.game.speed;
+      this.speedButtons.forEach((b, i) => b.classList.toggle('active', shown.speed === i));
+    }
+    this.syncMenu();
+    if (this.game.tool.selected !== shown.selected) {
+      shown.selected = this.game.tool.selected;
+      this.renderInfo(true);
+    } else if (!this.info.hidden && this.infoDay !== s.day) {
+      this.renderInfo(false);
+    }
+    if (!this.budget.hidden && s.budget !== shown.budget) this.renderBudget();
     for (const event of this.game.sim.takeEvents()) this.onEvent(event);
   }
 
@@ -171,13 +176,29 @@ export class Hud {
     this.root.remove();
   }
 
+  private infoDay = -1;
+
+  private renderStats(): void {
+    const s = this.game.sim.state;
+    this.stats.money.textContent = num(s.money);
+    this.stats.money.classList.toggle('negative', s.money < 0);
+    this.stats.population.textContent = num(s.population);
+    this.stats.happiness.textContent = `${Math.round(s.happiness)}`;
+    this.stats.date.textContent = formatDate(s.day);
+    ZONE_KINDS.forEach((zone, i) => {
+      const bar = this.stats.demand[i];
+      const d = s.demand[zone];
+      if (!bar) return;
+      bar.style.setProperty('--fill', `${Math.round(Math.abs(d) * 100)}%`);
+      bar.classList.toggle('negative', d < 0);
+    });
+  }
+
   private buildTopBar(): HTMLElement {
     const stat = (label: string, value: HTMLElement): HTMLElement =>
       el('div.stat', {}, el('span.stat-label', {}, label), value);
     for (const [i, label] of ['Pause', '1x', '2x', '3x'].entries()) {
-      this.speedButtons.push(
-        el('button.speed', { type: 'button', onclick: () => this.setSpeed(i) }, label),
-      );
+      this.speedButtons.push(el('button.speed', { onclick: () => this.setSpeed(i) }, label));
     }
     return el(
       'header.topbar',
@@ -195,84 +216,82 @@ export class Hud {
       el('div.spacer'),
       this.stats.date,
       el('div.speeds', {}, ...this.speedButtons),
-      el('button.ghost', { type: 'button', onclick: () => this.toggleBudget() }, 'Budget'),
-      el('button.ghost', { type: 'button', onclick: () => this.togglePause() }, 'Menu'),
+      el('button.ghost', { onclick: () => this.toggleBudget() }, 'Budget'),
+      el('button.ghost', { onclick: () => (this.paused ? this.resume() : this.pause()) }, 'Menu'),
     );
   }
 
-  private renderMenu(): void {
-    clear(this.menu);
+  /** Category bar plus one hidden item panel per category; `syncMenu` picks what shows. */
+  private buildMenu(): HTMLElement {
+    const bar = el('nav.menu');
     CATEGORIES.forEach((cat, i) => {
-      this.menu.append(
-        el(
-          `button.category${i === this.category ? '.active' : ''}`,
-          { type: 'button', onclick: () => this.openCategory(i) },
-          el('kbd', {}, `${i + 1}`),
-          cat.label,
-        ),
+      this.categoryButtons.push(
+        el('button.category', { onclick: () => this.openCategory(i) }, el('kbd', {}, `${i + 1}`), cat.label),
       );
+      const buttons = cat.items.map((item): [MenuItem, HTMLElement] => {
+        const cost = this.game.sim.price(item.cost);
+        return [
+          item,
+          el(
+            'button.item',
+            { onclick: () => this.game.tool.setTool(item.tool) },
+            el('span', {}, item.label),
+            el('span.cost', {}, cost === 0 ? 'Free' : num(cost)),
+          ),
+        ];
+      });
+      const panel = el('div.menu-items', {}, ...buttons.map(([, b]) => b));
+      this.itemPanels.push({ panel, buttons });
+      this.root.append(panel);
     });
-    clear(this.items);
-    const cat = CATEGORIES[this.category];
-    this.items.hidden = !cat;
-    if (!cat) return;
-    const founded = this.game.sim.state.townHallId !== undefined;
-    for (const item of cat.items) {
-      if (item.tool.kind === 'building' && item.tool.building === 'townHall' && founded) continue;
-      const active = JSON.stringify(item.tool) === JSON.stringify(this.game.tool.tool);
-      const cost = Math.round(item.cost * DIFFICULTY[this.game.sim.state.difficulty].costMultiplier);
-      this.items.append(
-        el(
-          `button.item${active ? '.active' : ''}`,
-          { type: 'button', onclick: () => this.pick(item.tool) },
-          el('span', {}, item.label),
-          el('span.cost', {}, cost === 0 ? 'Free' : money(cost)),
-        ),
-      );
-    }
+    bar.append(...this.categoryButtons);
+    return bar;
+  }
+
+  private syncMenu(): void {
+    const current = this.game.tool.tool;
+    const founded = this.game.sim.state.founded;
+    this.categoryButtons.forEach((b, i) => b.classList.toggle('active', i === this.category));
+    this.itemPanels.forEach(({ panel, buttons }, i) => {
+      panel.hidden = i !== this.category;
+      for (const [item, b] of buttons) {
+        b.classList.toggle('active', item.tool === current);
+        if (item === TOWN_HALL) b.hidden = founded;
+      }
+    });
   }
 
   private openCategory(i: number): void {
     this.category = this.category === i ? -1 : i;
-    if (this.category === -1) this.game.tool.setTool({ kind: 'none' });
-    else {
-      const first = CATEGORIES[i]?.items[0];
-      if (first && CATEGORIES[i]?.items.length === 1) this.game.tool.setTool(first.tool);
-    }
-    this.renderMenu();
-  }
-
-  private pick(tool: Tool): void {
-    this.game.tool.setTool(tool);
-    this.renderMenu();
+    const items = CATEGORIES[this.category]?.items;
+    this.game.tool.setTool(items?.length === 1 && items[0] ? items[0].tool : { kind: 'none' });
   }
 
   private escape(): void {
-    if (this.paused) return this.togglePause();
+    if (this.paused) return this.resume();
     if (this.game.tool.tool.kind !== 'none' || this.category !== -1) {
       this.category = -1;
       this.game.tool.setTool({ kind: 'none' });
-      this.renderMenu();
       return;
     }
     if (this.game.tool.selected) return this.game.tool.select(undefined);
-    this.togglePause();
+    this.pause();
   }
 
   private setSpeed(speed: number): void {
-    if (this.paused) return;
-    this.game.speed = speed;
+    if (!this.paused) this.game.speed = speed;
   }
 
-  private renderInfo(): void {
+  private renderInfo(selectionChanged: boolean): void {
     const tile = this.game.tool.selected;
+    const s = this.game.sim.state;
+    this.infoDay = s.day;
     clear(this.info);
     this.info.hidden = !tile;
     if (!tile) {
       this.game.highlight(undefined);
       return;
     }
-    const s = this.game.sim.state;
     const t = idx(tile.x, tile.y);
     const rows: [string, string][] = [];
     const id = s.buildingId[t];
@@ -281,17 +300,14 @@ export class Hud {
     if (b) {
       const def = BUILDINGS[b.kind];
       title = def.label;
-      rows.push(['Upkeep', `${money(def.upkeep)} a month`]);
+      rows.push(['Upkeep', `${num(def.upkeep)} a month`]);
       if (def.radius > 0) rows.push(['Reach', `${def.radius} tiles`]);
       if (def.jobs > 0) rows.push(['Jobs', `${def.jobs}`]);
-      const r = def.radius;
-      this.game.highlight(
-        rectTiles(b.x - r, b.y - r, b.x + def.size - 1 + r, b.y + def.size - 1 + r).map(
-          (tt): PlanTile => ({ x: tt % MAP_SIZE, y: Math.floor(tt / MAP_SIZE), status: 'keep' }),
-        ),
-      );
+      if (selectionChanged) {
+        this.game.highlight(footprint(b, def.radius).map((tt) => ({ x: xOf(tt), y: yOf(tt) })));
+      }
     } else {
-      this.game.highlight([{ x: tile.x, y: tile.y, status: 'keep' }]);
+      if (selectionChanged) this.game.highlight([tile]);
       const zone = s.zone[t] as Zone;
       if (zone !== Zone.None) {
         const level = s.level[t];
@@ -315,15 +331,15 @@ export class Hud {
   }
 
   private toggleBudget(): void {
-    this.budgetOpen = !this.budgetOpen;
-    this.budget.hidden = !this.budgetOpen;
-    if (this.budgetOpen) this.renderBudget();
+    this.budget.hidden = !this.budget.hidden;
+    if (!this.budget.hidden) this.renderBudget();
   }
 
   private renderBudget(): void {
     const s = this.game.sim.state;
+    this.shown.budget = s.budget;
     clear(this.budget);
-    const slider = input('', {
+    const slider = el<HTMLInputElement>('input', {
       type: 'range',
       min: '0',
       max: `${MAX_TAX_RATE}`,
@@ -336,28 +352,21 @@ export class Hud {
       rate.textContent = `${this.game.sim.state.taxRate}%`;
     });
     const line = (k: string, v: number): HTMLElement =>
-      el('div.row', {}, el('span', {}, k), el('span', {}, money(v)));
-    const taxes = ([Zone.Residential, Zone.Commercial, Zone.Industrial] as const).map((z) =>
-      line(ZONE_LABEL[z], s.budget.taxes[z]),
-    );
-    const upkeep = Object.entries(s.budget.upkeep).map(([k, v]) =>
-      line(k === 'road' ? 'Roads' : BUILDINGS[k as BuildingKind].label, v),
-    );
+      el('div.row', {}, el('span', {}, k), el('span', {}, num(v)));
+    const total = (k: string, v: number): HTMLElement =>
+      el('div.row.total', {}, el('span', {}, k), el('span', {}, num(v)));
     this.budget.append(
       el('h2', {}, 'Budget'),
       el('div.row', {}, el('span', {}, 'Tax rate'), rate),
       slider,
       el('h3', {}, 'Last month'),
-      el('div.row.total', {}, el('span', {}, 'Income'), el('span', {}, money(s.budget.income))),
-      ...taxes,
-      el('div.row.total', {}, el('span', {}, 'Expenses'), el('span', {}, money(s.budget.expenses))),
-      ...upkeep,
-      el(
-        'div.row.total',
-        {},
-        el('span', {}, 'Balance'),
-        el('span', {}, money(s.budget.income - s.budget.expenses)),
+      total('Income', s.budget.income),
+      ...ZONE_KINDS.map((z) => line(ZONE_LABEL[z], s.budget.taxes[z])),
+      total('Expenses', s.budget.expenses),
+      ...Object.entries(s.budget.upkeep).map(([k, v]) =>
+        line(k === 'road' ? 'Roads' : BUILDINGS[k as BuildingKind].label, v),
       ),
+      total('Balance', s.budget.income - s.budget.expenses),
     );
   }
 
@@ -365,25 +374,23 @@ export class Hud {
     const node = el('div.toast', {}, text);
     this.toasts.append(node);
     while (this.toasts.childElementCount > 4) this.toasts.firstElementChild?.remove();
-    window.setTimeout(() => node.classList.add('fade'), 2600);
-    window.setTimeout(() => node.remove(), 3200);
+    fadeOut(node, 2600, 3200);
   }
 
   private onEvent(event: SimEvent): void {
     switch (event.kind) {
       case 'founded':
         this.card('The town is founded', 'Lay a road and zone beside it.');
-        this.renderMenu();
         break;
       case 'service':
         this.toast(`First ${BUILDINGS[event.building].label.toLowerCase()} opens.`);
         break;
       case 'population':
-        this.card(`${event.count.toLocaleString('en-GB')} residents`, 'The town grows.');
+        this.card(`${num(event.count)} residents`, 'The town grows.');
         break;
       case 'won': {
         const target = DIFFICULTY[this.game.sim.state.difficulty].winTarget;
-        this.card('A town to be proud of', `${target.toLocaleString('en-GB')} residents. Carry on, mayor.`);
+        this.card('A town to be proud of', `${num(target)} residents. Carry on, mayor.`);
         break;
       }
       case 'lost':
@@ -404,12 +411,10 @@ export class Hud {
     this.cardShowing = true;
     const node = el('div.card', {}, el('h2', {}, next[0]), el('p', {}, next[1]));
     this.root.append(node);
-    window.setTimeout(() => node.classList.add('fade'), 2800);
-    window.setTimeout(() => {
-      node.remove();
+    fadeOut(node, 2800, 3600, () => {
       this.cardShowing = false;
       this.showNextCard();
-    }, 3600);
+    });
   }
 
   private gameOver(): void {
@@ -417,56 +422,41 @@ export class Hud {
     this.game.speed = 0;
     this.showOverlay(
       'The town is bankrupt',
-      el('p', {}, `${formatDate(s.day)}. ${Math.round(s.population)} residents, ${money(s.money)} in debt.`),
-      el('button.primary', { type: 'button', onclick: () => this.callbacks.onNewTown() }, 'New town'),
+      el('p', {}, `${formatDate(s.day)}. ${num(s.population)} residents, ${num(-s.money)} in debt.`),
+      el('button.primary', { onclick: () => this.callbacks.onNewTown() }, 'New town'),
     );
   }
 
-  private togglePause(): void {
-    if (this.paused) {
-      this.paused = false;
-      this.overlay.hidden = true;
-      this.game.speed = this.pausedSpeed;
-      return;
-    }
-    if (this.game.sim.state.status === 'lost') return;
+  private pause(): void {
+    if (this.paused || this.game.sim.state.status === 'lost') return;
     this.paused = true;
     this.pausedSpeed = this.game.speed;
     this.game.speed = 0;
-    const swatches = el(
-      'div.swatches',
-      {},
-      ...PALETTE_NAMES.map((name) => this.paletteSwatch(name)),
-    );
-    this.showOverlay(
-      'Paused',
-      el('button.primary', { type: 'button', onclick: () => this.togglePause() }, 'Resume'),
-      el('p.field-label', {}, 'Palette'),
-      swatches,
-      el('button.ghost', { type: 'button', onclick: () => this.callbacks.onNewTown() }, 'New town'),
-    );
+    this.renderPauseMenu();
   }
 
-  private paletteSwatch(name: PaletteName): HTMLElement {
-    const p = PALETTES[name];
-    return el(
-      `button.swatch${this.game.paletteName === name ? '.active' : ''}`,
-      {
-        type: 'button',
-        onclick: () => {
-          this.game.setPalette(name);
-          this.togglePause();
-          this.togglePause();
-        },
-      },
+  private resume(): void {
+    this.paused = false;
+    this.overlay.hidden = true;
+    this.game.speed = this.pausedSpeed;
+  }
+
+  private renderPauseMenu(): void {
+    this.showOverlay(
+      'Paused',
+      el('button.primary', { onclick: () => this.resume() }, 'Resume'),
+      el('p.field-label', {}, 'Palette'),
       el(
-        'span.swatch-row',
+        'div.swatches',
         {},
-        ...[p.grass, p.walls[0], p.roofs[1], p.waterDeep].map((hex) =>
-          el('i.dot', { style: `background:${hex}` }),
+        ...PALETTE_NAMES.map((name) =>
+          paletteSwatch(name, this.game.paletteName === name, () => {
+            this.game.setPalette(name);
+            this.renderPauseMenu();
+          }),
         ),
       ),
-      el('span.swatch-label', {}, p.label),
+      el('button.ghost', { onclick: () => this.callbacks.onNewTown() }, 'New town'),
     );
   }
 
@@ -487,13 +477,16 @@ export class Hud {
         {},
         el('h3', {}, hint[0]),
         el('p', {}, hint[1]),
-        el(
-          'button.ghost',
-          { type: 'button', onclick: () => (this.hint++, this.showHint()) },
-          last ? 'Got it' : 'Next',
-        ),
+        el('button.ghost', { onclick: () => (this.hint++, this.showHint()) }, last ? 'Got it' : 'Next'),
       ),
     );
   }
 }
 
+function fadeOut(node: HTMLElement, fadeAt: number, removeAt: number, then?: () => void): void {
+  window.setTimeout(() => node.classList.add('fade'), fadeAt);
+  window.setTimeout(() => {
+    node.remove();
+    then?.();
+  }, removeAt);
+}

@@ -1,13 +1,12 @@
 import * as THREE from 'three';
 import { TILE_COUNT } from '../sim/grid';
-import type { PlanTile } from '../sim/sim';
+import type { Point } from '../sim/grid';
+import type { PlanStatus } from '../sim/sim';
 
 export type PreviewTint = 'build' | 'remove' | 'ring';
 
-const CHANGE = new THREE.Color('#ffffff');
-const KEEP = new THREE.Color('#ffffff');
-const REMOVE = new THREE.Color('#c4453a');
-const BLOCKED = new THREE.Color('#c4453a');
+const WHITE = new THREE.Color('#ffffff');
+const RED = new THREE.Color('#c4453a');
 const RING = new THREE.Color('#f6eedc');
 
 /** Translucent tile highlights for the build preview, coloured per tile. */
@@ -30,22 +29,14 @@ export class CursorLayer {
     this.object.renderOrder = 10;
   }
 
-  show(tiles: readonly PlanTile[], tint: PreviewTint): void {
+  show(tiles: readonly (Point & { status?: PlanStatus })[], tint: PreviewTint): void {
     let n = 0;
     for (const { x, y, status } of tiles) {
       if (status === 'keep' && tint === 'remove') continue;
       this.matrix.makeTranslation(x + 0.5, 0.08, y + 0.5);
       this.object.setMatrixAt(n, this.matrix);
       const color =
-        tint === 'ring'
-          ? RING
-          : status === 'blocked'
-            ? BLOCKED
-            : tint === 'remove'
-              ? REMOVE
-              : status === 'keep'
-                ? KEEP
-                : CHANGE;
+        tint === 'ring' ? RING : status === 'blocked' || tint === 'remove' ? RED : WHITE;
       this.object.setColorAt(n, color);
       n++;
     }

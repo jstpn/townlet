@@ -1,7 +1,7 @@
 import { BUILDINGS, type BuildingKind, ROAD_UPKEEP, TAX_BASE } from './catalogue';
 import type { DifficultySettings } from './difficulty';
 import { TILE_COUNT } from './grid';
-import { type Fields, capacity } from './growth';
+import { type Fields, held } from './growth';
 import type { SimState } from './sim';
 import { Zone, type ZoneKind } from './types';
 
@@ -54,12 +54,12 @@ export function computeHappiness(state: SimState, fields: Fields): number {
   const c = fields.coverage;
   for (let tile = 0; tile < TILE_COUNT; tile++) {
     if (state.zone[tile] !== Zone.Residential) continue;
-    const held = capacity(state, tile) * state.occupancy[tile];
-    if (held === 0) continue;
-    residents += held;
-    if (c.school[tile] && c.clinic[tile] && c.police[tile] && c.fire[tile]) covered += held;
-    if (c.park[tile] || c.plaza[tile]) parked += held;
-    if (fields.pollution[tile] > 0) smoked += held;
+    const people = held(state, tile);
+    if (people === 0) continue;
+    residents += people;
+    if (c.school[tile] && c.clinic[tile] && c.police[tile] && c.fire[tile]) covered += people;
+    if (c.park[tile] || c.plaza[tile]) parked += people;
+    if (fields.pollution[tile] > 0) smoked += people;
   }
   const share = (part: number): number => (100 * part) / residents;
   const workers = state.population * 0.6;

@@ -4,11 +4,12 @@ import {
   ROAD_COST,
   ZONE_COST,
   type BuildingKind,
+  footprint,
 } from './catalogue';
 import { DIFFICULTY, type Difficulty } from './difficulty';
 import { type Budget, computeHappiness, settleMonth } from './economy';
 import { type Coverage, computeCoverage, computePollution, computeRoadAccess } from './fields';
-import { TILE_COUNT, idx, inBounds, lineTiles, rectTiles, snapToAxis, xOf, yOf } from './grid';
+import { TILE_COUNT, clamp, idx, inBounds, lineTiles, rectTiles, snapToAxis, xOf, yOf } from './grid';
 import { type Demand, type Fields, computeDemand, stepGrowth } from './growth';
 import { generateMap } from './mapgen';
 import { type Rng, createRng } from './rng';
@@ -75,7 +76,8 @@ export type SimState = {
   buildingId: Int32Array;
   buildings: Map<number, Building>;
   nextBuildingId: number;
-  townHallId: number | undefined;
+  /** True once the town hall stands; nothing else may be built before it. */
+  founded: boolean;
   /** Days a developed lot has sat near-empty with negative demand, and days it has been undesirable. */
   starveDays: Uint8Array;
   blightDays: Uint8Array;
@@ -122,12 +124,12 @@ export class Sim {
       buildingId: new Int32Array(TILE_COUNT).fill(-1),
       buildings: new Map(),
       nextBuildingId: 1,
-      townHallId: undefined,
+      founded: false,
       starveDays: new Uint8Array(TILE_COUNT),
       blightDays: new Uint8Array(TILE_COUNT),
       population: 0,
       jobs: 0,
-      demand: { residential: 0, commercial: 0, industrial: 0 },
+      demand: { 1: 0, 2: 0, 3: 0 },
       happiness: 100,
       taxRate: 10,
       budget: { income: 0, expenses: 0, taxes: { 1: 0, 2: 0, 3: 0 }, upkeep: {} },
@@ -140,7 +142,7 @@ export class Sim {
   /** Advances one game day: demand, happiness, growth on every lot, and the budget on month days. */
   step(): void {
     const s = this.state;
-    if (s.status === 'lost' || s.townHallId === undefined) return;
+    if (s.status === 'lost' || !s.founded) return;
     const settings = DIFFICULTY[s.difficulty];
     s.day++;
     Object.assign(s, computeDemand(s));
@@ -162,11 +164,12 @@ export class Sim {
   }
 
   setTaxRate(rate: number): void {
-    this.state.taxRate = Math.max(0, Math.min(MAX_TAX_RATE, Math.round(rate)));
+    this.state.taxRate = clamp(Math.round(rate), 0, MAX_TAX_RATE);
   }
 
   /** Returns and clears the events raised since the last call. */
   takeEvents(): SimEvent[] {
+    if (this.events.length === 0) return this.events;
     const events = this.events;
     this.events = [];
     return events;
@@ -218,12 +221,11 @@ export class Sim {
     const tiles = lineTiles(x0, y0, end.x, end.y);
     let cost = 0;
     const planned = tiles.map((tile): PlanTile => {
-      const status: PlanStatus =
-        this.state.terrain[tile] === Terrain.Water || this.state.buildingId[tile] !== -1
-          ? 'blocked'
-          : this.state.road[tile] === 1
-            ? 'keep'
-            : 'change';
+      const status: PlanStatus = this.occupied(tile)
+        ? this.state.road[tile] === 1
+          ? 'keep'
+          : 'blocked'
+        : 'change';
       if (status === 'change') cost += this.price(ROAD_COST) + this.clearingFee(tile);
       return { x: xOf(tile), y: yOf(tile), status };
     });
@@ -245,10 +247,7 @@ export class Sim {
     const planned = rectTiles(x0, y0, x1, y1).map((tile): PlanTile => {
       const s = this.state;
       const status: PlanStatus =
-        s.terrain[tile] === Terrain.Water ||
-        s.road[tile] === 1 ||
-        s.buildingId[tile] !== -1 ||
-        (s.zone[tile] !== zone && s.level[tile] > 0)
+        this.occupied(tile) || (s.zone[tile] !== zone && s.level[tile] > 0)
           ? 'blocked'
           : s.zone[tile] === zone
             ? 'keep'
@@ -262,10 +261,7 @@ export class Sim {
   zoneRect(zone: ZoneKind, x0: number, y0: number, x1: number, y1: number): CommandResult {
     return this.execute(this.planZoneRect(zone, x0, y0, x1, y1), (tile) => {
       this.clearForest(tile);
-      this.state.zone[tile] = zone;
-      this.state.level[tile] = 0;
-      this.state.occupancy[tile] = 0;
-      this.state.rev.zones++;
+      this.setZone(tile, zone);
     });
   }
 
@@ -273,29 +269,16 @@ export class Sim {
   planBuilding(kind: BuildingKind, x: number, y: number): Plan {
     const def = BUILDINGS[kind];
     const s = this.state;
-    if (kind === 'townHall' && s.townHallId !== undefined) {
-      return { tiles: [], cost: 0, error: 'already-built' };
-    }
-    const footprint = rectTiles(x, y, x + def.size - 1, y + def.size - 1);
+    if (kind === 'townHall' && s.founded) return { tiles: [], cost: 0, error: 'already-built' };
     let cost = this.price(def.cost);
-    const planned = footprint.map((tile): PlanTile => {
-      const blocked =
-        s.terrain[tile] === Terrain.Water ||
-        s.road[tile] === 1 ||
-        s.buildingId[tile] !== -1 ||
-        s.level[tile] > 0;
+    const planned = footprint({ kind, x, y }).map((tile): PlanTile => {
+      const blocked = this.occupied(tile) || s.level[tile] > 0;
       if (!blocked) cost += this.clearingFee(tile);
       return { x: xOf(tile), y: yOf(tile), status: blocked ? 'blocked' : 'change' };
     });
-    if (planned.length < footprint.length || footprint.length < def.size * def.size) {
-      return { tiles: planned, cost, error: 'out-of-bounds' };
-    }
-    if (planned.some((t) => t.status === 'blocked')) {
-      return { tiles: planned, cost, error: 'occupied' };
-    }
-    if (kind !== 'townHall' && s.townHallId === undefined) {
-      return { tiles: planned, cost, error: 'needs-town-hall' };
-    }
+    if (planned.length < def.size * def.size) return { tiles: planned, cost, error: 'out-of-bounds' };
+    if (planned.some((t) => t.status === 'blocked')) return { tiles: planned, cost, error: 'occupied' };
+    if (kind !== 'townHall' && !s.founded) return { tiles: planned, cost, error: 'needs-town-hall' };
     return this.priced(planned, cost);
   }
 
@@ -304,7 +287,7 @@ export class Sim {
     if (plan.error) return { ok: false, reason: plan.error };
     const id = this.state.nextBuildingId++;
     this.state.buildings.set(id, { id, kind, x, y });
-    if (kind === 'townHall') this.state.townHallId = id;
+    if (kind === 'townHall') this.state.founded = true;
     const result = this.execute(plan, (tile) => {
       this.clearForest(tile);
       this.clearZone(tile);
@@ -355,7 +338,8 @@ export class Sim {
     });
   }
 
-  private price(base: number): number {
+  /** What a base price costs at this difficulty. */
+  price(base: number): number {
     return Math.round(base * DIFFICULTY[this.state.difficulty].costMultiplier);
   }
 
@@ -372,7 +356,7 @@ export class Sim {
   /** Shared validation for tile-painting plans: needs a town hall, something to change, and funds. */
   private checked(tiles: PlanTile[], cost: number, allBlocked: CommandError): Plan {
     if (tiles.length === 0) return { tiles, cost, error: 'out-of-bounds' };
-    if (this.state.townHallId === undefined) return { tiles, cost, error: 'needs-town-hall' };
+    if (!this.state.founded) return { tiles, cost, error: 'needs-town-hall' };
     if (tiles.every((t) => t.status === 'blocked')) return { tiles, cost, error: allBlocked };
     if (!tiles.some((t) => t.status === 'change')) return { tiles, cost, error: 'nothing-to-build' };
     return this.priced(tiles, cost);
@@ -394,12 +378,22 @@ export class Sim {
     this.state.rev.terrain++;
   }
 
-  private clearZone(tile: number): void {
-    if (this.state.zone[tile] === Zone.None) return;
-    this.state.zone[tile] = Zone.None;
+  /** Water, road or building: nothing else goes here. */
+  private occupied(tile: number): boolean {
+    const s = this.state;
+    return s.terrain[tile] === Terrain.Water || s.road[tile] === 1 || s.buildingId[tile] !== -1;
+  }
+
+  private setZone(tile: number, zone: Zone): void {
+    if (this.state.zone[tile] === zone) return;
+    this.state.zone[tile] = zone;
     this.state.level[tile] = 0;
     this.state.occupancy[tile] = 0;
     this.state.rev.zones++;
+  }
+
+  private clearZone(tile: number): void {
+    this.setZone(tile, Zone.None);
   }
 
   private removeBuilding(tile: number): void {
@@ -407,10 +401,7 @@ export class Sim {
     if (id === -1) return;
     const building = this.state.buildings.get(id);
     if (!building) return;
-    const size = BUILDINGS[building.kind].size;
-    for (const t of rectTiles(building.x, building.y, building.x + size - 1, building.y + size - 1)) {
-      this.state.buildingId[t] = -1;
-    }
+    for (const t of footprint(building)) this.state.buildingId[t] = -1;
     this.state.buildings.delete(id);
     this.state.rev.buildings++;
   }

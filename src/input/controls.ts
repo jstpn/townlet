@@ -87,7 +87,9 @@ export class CameraControls {
       this.held.clear();
       return;
     }
-    this.held.add(e.key.toLowerCase());
+    const key = e.key.toLowerCase();
+    if (!e.repeat && (key === 'q' || key === 'e')) this.rig.rotate(key === 'q' ? -1 : 1);
+    this.held.add(key);
   };
 
   private readonly onKeyUp = (e: KeyboardEvent): void => {

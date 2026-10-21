@@ -49,9 +49,6 @@ body {
   inset: 0;
   font-size: 14px;
   letter-spacing: 0.01em;
-}
-
-.hud {
   pointer-events: none;
 }
 

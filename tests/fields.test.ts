@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { idx } from '../src/sim/grid';
-import { Sim } from '../src/sim/sim';
-import { Terrain, Zone } from '../src/sim/types';
-import { flatTerrain } from './helpers';
-
-const founded = (): Sim => {
-  const sim = new Sim({ seed: 'test', difficulty: 'normal', terrain: flatTerrain(Terrain.Grass) });
-  sim.placeBuilding('townHall', 30, 30);
-  return sim;
-};
+import { Zone } from '../src/sim/types';
+import { foundedSim as founded } from './helpers';
 
 describe('coverage', () => {
   it('the town hall covers every service within its radius of the footprint', () => {

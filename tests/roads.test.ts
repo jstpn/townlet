@@ -2,13 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { idx } from '../src/sim/grid';
 import { Sim } from '../src/sim/sim';
 import { Terrain } from '../src/sim/types';
-import { flatTerrain } from './helpers';
+import { flatTerrain, foundedSim } from './helpers';
 
-const newSim = (terrain = flatTerrain(Terrain.Grass), money?: number): Sim => {
-  const sim = new Sim({ seed: 'test', difficulty: 'normal', terrain, money });
-  if (terrain[idx(30, 30)] !== Terrain.Water) sim.placeBuilding('townHall', 30, 30);
-  return sim;
-};
+const newSim = (terrain?: Uint8Array, money?: number): Sim => foundedSim({ terrain, money });
 
 describe('roads', () => {
   it('places a road on grass and charges for it', () => {

@@ -1,3 +1,4 @@
+import { rectTiles } from './grid';
 import { Zone, type ZoneKind } from './types';
 
 /** Prices at normal difficulty, before the cost multiplier. */
@@ -61,6 +62,8 @@ export const TAX_BASE: Record<ZoneKind, readonly [number, number, number]> = {
   [Zone.Industrial]: [4, 10, 22],
 };
 
-export function isBuildingKind(value: string): value is BuildingKind {
-  return (BUILDING_KINDS as readonly string[]).includes(value);
+/** Tiles of a building's footprint, widened by `pad` on every side (its reach when pad is the radius). */
+export function footprint(b: { kind: BuildingKind; x: number; y: number }, pad = 0): number[] {
+  const last = BUILDINGS[b.kind].size - 1;
+  return rectTiles(b.x - pad, b.y - pad, b.x + last + pad, b.y + last + pad);
 }

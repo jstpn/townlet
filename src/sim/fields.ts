@@ -1,5 +1,5 @@
-import { BUILDINGS, SERVICES, type Service } from './catalogue';
-import { MAP_SIZE, TILE_COUNT, idx, rectTiles } from './grid';
+import { BUILDINGS, SERVICES, type Service, footprint } from './catalogue';
+import { MAP_SIZE, TILE_COUNT, idx, rectTiles, xOf, yOf } from './grid';
 import type { SimState } from './sim';
 import { Zone } from './types';
 
@@ -16,8 +16,8 @@ function stamp(
   value: (d: number) => number,
 ): void {
   for (const tile of rectTiles(x0 - radius, y0 - radius, x1 + radius, y1 + radius)) {
-    const x = tile % MAP_SIZE;
-    const y = Math.floor(tile / MAP_SIZE);
+    const x = xOf(tile);
+    const y = yOf(tile);
     const d = Math.max(0, x0 - x, x - x1, y0 - y, y - y1);
     const v = value(d);
     if (v > grid[tile]) grid[tile] = v;
@@ -32,7 +32,7 @@ export function computeCoverage(state: SimState): Coverage {
   for (const b of state.buildings.values()) {
     const def = BUILDINGS[b.kind];
     for (const service of def.services) {
-      stamp(coverage[service], b.x, b.y, b.x + def.size - 1, b.y + def.size - 1, def.radius, () => 1);
+      for (const tile of footprint(b, def.radius)) coverage[service][tile] = 1;
     }
   }
   return coverage;

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { CameraControls } from './input/controls';
-import { bindKeys } from './input/keymap';
 import { Pointer } from './input/pointer';
 import { BuildTool } from './input/tools';
 import { BuildingLayer } from './render/buildings';
@@ -13,7 +12,8 @@ import { TerrainLayer } from './render/terrain';
 import { WaterLayer } from './render/water';
 import { ZoneLayer } from './render/zones';
 import type { Difficulty } from './sim/difficulty';
-import { type PlanTile, Sim } from './sim/sim';
+import type { Point } from './sim/grid';
+import { Sim } from './sim/sim';
 
 const DAY_SECONDS = 0.5;
 
@@ -28,7 +28,6 @@ export class Game {
   readonly sim: Sim;
   readonly gfx: GameRenderer;
   readonly tool: BuildTool;
-  paletteName: PaletteName;
   private palette: Palette;
   private readonly layers: Layer[] = [
     new WaterLayer(),
@@ -45,13 +44,11 @@ export class Game {
   /** Sim speed multiplier: 0 pauses, 1 to 3 run. One day lasts half a second at 1x. */
   speed = 1;
   private dayClock = 0;
-  private readonly unbindKeys: () => void;
   private previewRev = -1;
   /** Called after each frame's simulation and before the render, for the HUD. */
   onFrame: (() => void) | undefined;
 
   constructor(canvas: HTMLCanvasElement, options: GameOptions) {
-    this.paletteName = options.palette;
     this.palette = PALETTES[options.palette];
     this.sim = new Sim({ seed: options.seed, difficulty: options.difficulty });
     this.gfx = new GameRenderer(canvas, this.palette);
@@ -60,11 +57,6 @@ export class Game {
     this.pointer = new Pointer(canvas);
     this.controls = new CameraControls(this.gfx.rig, this.pointer, canvas);
     this.tool = new BuildTool(this.sim, this.gfx.rig, this.pointer);
-    this.unbindKeys = bindKeys({
-      q: () => this.gfx.rig.rotate(-1),
-      e: () => this.gfx.rig.rotate(1),
-      ' ': () => (this.speed = this.speed === 0 ? 1 : 0),
-    });
     this.gfx.renderer.setAnimationLoop(this.frame);
   }
 
@@ -78,19 +70,21 @@ export class Game {
   }
 
   /** Soft highlight under the info panel's selection, or a building's reach. */
-  highlight(tiles: readonly PlanTile[] | undefined): void {
+  highlight(tiles: readonly Point[] | undefined): void {
     if (tiles) this.ring.show(tiles, 'ring');
     else this.ring.clear();
   }
 
+  get paletteName(): PaletteName {
+    return this.palette.name;
+  }
+
   setPalette(name: PaletteName): void {
-    this.paletteName = name;
     this.palette = PALETTES[name];
     this.gfx.setPalette(this.palette);
   }
 
   dispose(): void {
-    this.unbindKeys();
     this.controls.dispose();
     this.pointer.dispose();
     this.gfx.dispose();

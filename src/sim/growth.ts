@@ -1,16 +1,16 @@
 import { BUILDINGS, ZONE_CAPACITY } from './catalogue';
 import type { DifficultySettings } from './difficulty';
 import type { Coverage } from './fields';
-import { MAP_SIZE, TILE_COUNT, rectTiles } from './grid';
+import { TILE_COUNT, clamp, rectTiles, xOf, yOf } from './grid';
 import type { Rng } from './rng';
 import type { SimState } from './sim';
 import { Zone, type ZoneKind } from './types';
 
-export type Demand = { residential: number; commercial: number; industrial: number };
+export type Demand = Record<ZoneKind, number>;
 
 export type Fields = { coverage: Coverage; roadAccess: Uint8Array; pollution: Float32Array };
 
-const clamp1 = (v: number): number => Math.max(-1, Math.min(1, v));
+const clamp1 = (v: number): number => clamp(v, -1, 1);
 
 /** Residents, jobs and the three demand bars, from what the lots currently hold. */
 export function computeDemand(state: SimState): {
@@ -22,11 +22,10 @@ export function computeDemand(state: SimState): {
   let commercialJobs = 0;
   let industrialJobs = 0;
   for (let tile = 0; tile < TILE_COUNT; tile++) {
-    const held = capacity(state, tile) * state.occupancy[tile];
     const zone = state.zone[tile];
-    if (zone === Zone.Residential) population += held;
-    else if (zone === Zone.Commercial) commercialJobs += held;
-    else if (zone === Zone.Industrial) industrialJobs += held;
+    if (zone === Zone.Residential) population += held(state, tile);
+    else if (zone === Zone.Commercial) commercialJobs += held(state, tile);
+    else if (zone === Zone.Industrial) industrialJobs += held(state, tile);
   }
   let serviceJobs = 0;
   for (const b of state.buildings.values()) serviceJobs += BUILDINGS[b.kind].jobs;
@@ -37,9 +36,11 @@ export function computeDemand(state: SimState): {
     population,
     jobs,
     demand: {
-      residential: clamp1((jobs - workers) / Math.max(jobs, 20) + baseline),
-      commercial: clamp1((population / 4 - commercialJobs) / Math.max(population / 4, 10)),
-      industrial: clamp1((population / 6 - industrialJobs) / Math.max(population / 6, 10) + 0.15),
+      [Zone.Residential]: clamp1((jobs - workers) / Math.max(jobs, 20) + baseline),
+      [Zone.Commercial]: clamp1((population / 4 - commercialJobs) / Math.max(population / 4, 10)),
+      [Zone.Industrial]: clamp1(
+        (population / 6 - industrialJobs) / Math.max(population / 6, 10) + 0.15,
+      ),
     },
   };
 }
@@ -52,10 +53,14 @@ export function capacity(state: SimState, tile: number): number {
   return ZONE_CAPACITY[zone as ZoneKind][level - 1] ?? 0;
 }
 
+/** Residents or jobs the lot holds right now. */
+export const held = (state: SimState, tile: number): number =>
+  capacity(state, tile) * state.occupancy[tile];
+
 function residentsNear(state: SimState, x: number, y: number, radius: number): number {
   let total = 0;
   for (const tile of rectTiles(x - radius, y - radius, x + radius, y + radius)) {
-    if (state.zone[tile] === Zone.Residential) total += capacity(state, tile) * state.occupancy[tile];
+    if (state.zone[tile] === Zone.Residential) total += held(state, tile);
   }
   return total;
 }
@@ -69,8 +74,8 @@ function industryNear(state: SimState, x: number, y: number, self: number): bool
 
 /** How much a zoned tile wants to grow, 0 to 1, from services, parks, neighbours and smoke. */
 export function desirability(state: SimState, fields: Fields, tile: number): number {
-  const x = tile % MAP_SIZE;
-  const y = Math.floor(tile / MAP_SIZE);
+  const x = xOf(tile);
+  const y = yOf(tile);
   const c = fields.coverage;
   const pollution = fields.pollution[tile];
   let score: number;
@@ -97,15 +102,8 @@ export function desirability(state: SimState, fields: Fields, tile: number): num
     default:
       return 0;
   }
-  return Math.max(0, Math.min(1, score));
+  return clamp(score, 0, 1);
 }
-
-const demandFor = (demand: Demand, zone: number): number =>
-  zone === Zone.Residential
-    ? demand.residential
-    : zone === Zone.Commercial
-      ? demand.commercial
-      : demand.industrial;
 
 /** One day of growth across every zoned tile. Returns true when any level changed. */
 export function stepGrowth(
@@ -121,9 +119,11 @@ export function stepGrowth(
     if (zone === Zone.None) continue;
     const served = fields.coverage.power[tile] === 1 && fields.coverage.water[tile] === 1;
     const reachable = fields.roadAccess[tile] === 1;
-    const demand = demandFor(state.demand, zone);
-    const want = desirability(state, fields, tile);
+    const demand = state.demand[zone as ZoneKind];
     const level = state.level[tile];
+    const mayGrow = served && reachable && level < 3 && demand > 0;
+    // Appeal is only read for blight on developed lots and for growth rolls.
+    const want = level > 0 || mayGrow ? desirability(state, fields, tile) : 0;
 
     if (level > 0) {
       const filling = demand > -0.2 && content;
@@ -145,8 +145,7 @@ export function stepGrowth(
       continue;
     }
 
-    if (!served || !reachable || level >= 3 || demand <= 0) continue;
-    if (want <= 0.35 + 0.15 * level) continue;
+    if (!mayGrow || want <= 0.35 + 0.15 * level) continue;
     if (rng.chance(settings.growthRate * demand * want)) {
       state.level[tile] = level + 1;
       changed = true;

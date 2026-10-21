@@ -31,14 +31,13 @@ const defaults: Partial<GameOptions> = {
 };
 
 async function run(initial: Partial<GameOptions>): Promise<void> {
-  const choice = await showStartScreen(hudRoot, initial, false);
-  if (choice.kind === 'continue') return run(initial);
-  const game = new Game(canvas, choice.options);
+  const options = await showStartScreen(hudRoot, initial);
+  const game = new Game(canvas, options);
   const hud = new Hud(hudRoot, game, {
     onNewTown: () => {
       hud.dispose();
       game.dispose();
-      void run({ ...choice.options, seed: undefined });
+      void run({ ...options, seed: undefined });
     },
   });
   game.onFrame = () => hud.update();
