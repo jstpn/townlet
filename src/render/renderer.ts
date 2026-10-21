@@ -32,7 +32,8 @@ export class GameRenderer {
     readonly canvas: HTMLCanvasElement,
     palette: Palette,
   ) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    // The composer target carries the multisampling; the canvas only ever shows a full-screen quad.
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -69,6 +70,7 @@ export class GameRenderer {
     this.grade = new ShaderPass(GradeShader);
     this.composer.addPass(this.grade);
     this.composer.addPass(new OutputPass());
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.setPalette(palette);
 
     window.addEventListener('resize', this.resize);
@@ -81,7 +83,6 @@ export class GameRenderer {
     this.sky.color.set(palette.sky);
     this.sky.groundColor.set(palette.grass);
     this.sunColor.set(palette.sun);
-    this.sun.color.copy(this.sunColor);
     (this.grade.uniforms.nightColor.value as THREE.Color).set(palette.night);
   }
 
@@ -91,6 +92,8 @@ export class GameRenderer {
     this.sky.intensity = SKY_INTENSITY * d.sky;
     this.sun.color.copy(this.sunColor).lerp(GOLDEN, d.warmth * 0.6);
     this.grade.uniforms.night.value = d.night;
+    // Only the window glow crosses the bloom threshold, so by day the pass has nothing to add.
+    this.bloom.enabled = d.night > 0;
   }
 
   /** Call after any shadow-casting geometry changes. */
@@ -102,9 +105,7 @@ export class GameRenderer {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.renderer.setSize(width, height);
-    this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.composer.setSize(width, height);
-    this.bloom.setSize(width, height);
     this.rig.resize(width, height);
   };
 

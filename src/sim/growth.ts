@@ -13,6 +13,17 @@ export type Fields = { coverage: Coverage; roadAccess: Uint8Array; pollution: Fl
 const clamp1 = (v: number): number => clamp(v, -1, 1);
 
 /** Residents, jobs and the three demand bars, from what the lots currently hold. */
+/** Share of residents who work. */
+const WORKER_SHARE = 0.4;
+/**
+ * Jobs the shops and factories aim to offer per worker. Above one, so a town that keeps up with
+ * its shops and factories always has room for more homes: residential demand at equilibrium is
+ * 1 - 1 / JOBS_PER_WORKER plus the baseline.
+ */
+const JOBS_PER_WORKER = 4 / 3;
+/** Of the wanted jobs, the share that is commercial; the rest is industrial. */
+const COMMERCIAL_SHARE = 5 / 8;
+
 export function computeDemand(state: SimState): {
   population: number;
   jobs: number;
@@ -30,9 +41,10 @@ export function computeDemand(state: SimState): {
   let serviceJobs = 0;
   for (const b of state.buildings.values()) serviceJobs += BUILDINGS[b.kind].jobs;
   const jobs = commercialJobs + industrialJobs + serviceJobs;
-  // Four in ten residents work; shops want a job per three residents and industry one per five,
-  // so a town that keeps up with its shops and factories always has room for more homes.
-  const workers = population * 0.4;
+  const workers = population * WORKER_SHARE;
+  const wantedJobs = workers * JOBS_PER_WORKER;
+  const commercialTarget = wantedJobs * COMMERCIAL_SHARE;
+  const industrialTarget = wantedJobs - commercialTarget;
   const baseline = 0.2 * Math.max(0, 1 - population / 500);
   return {
     population,
@@ -40,10 +52,10 @@ export function computeDemand(state: SimState): {
     demand: {
       [Zone.Residential]: clamp1((jobs - workers) / Math.max(jobs, 20) + baseline),
       [Zone.Commercial]: clamp1(
-        (population / 3 - commercialJobs) / Math.max(population / 3, 10) + 0.1,
+        (commercialTarget - commercialJobs) / Math.max(commercialTarget, 10) + 0.1,
       ),
       [Zone.Industrial]: clamp1(
-        (population / 5 - industrialJobs) / Math.max(population / 5, 10) + 0.15,
+        (industrialTarget - industrialJobs) / Math.max(industrialTarget, 10) + 0.15,
       ),
     },
   };
@@ -157,4 +169,3 @@ export function stepGrowth(
   }
   return changed;
 }
-

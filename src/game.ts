@@ -8,7 +8,7 @@ import { CursorLayer } from './render/cursor';
 import { CYCLE_DAYS, daylight } from './render/daylight';
 import { FireLayer } from './render/fire';
 import type { Layer } from './render/layer';
-import type { CameraPose } from './render/camera';
+import { type CameraPose, ZOOM_MAX } from './render/camera';
 import { PALETTES, type Palette, type PaletteName } from './render/palette';
 import { GameRenderer } from './render/renderer';
 import { RoadLayer } from './render/roads';
@@ -22,8 +22,8 @@ import { restoreSim, snapshot } from './sim/save';
 import { Sim } from './sim/sim';
 
 const DAY_SECONDS = 0.5;
-/** A new town is founded in the morning, not in the dark. */
-const START_PHASE = 0.25;
+/** Zoom the postcard fit measures at; the answer scales linearly from here. */
+const FIT_ZOOM = 10;
 
 export type GameOptions = {
   seed: string;
@@ -104,7 +104,13 @@ export class Game {
   /** The autosave: the sim, the palette and where the camera looks. A lost town is not worth keeping. */
   save(): void {
     if (this.sim.state.status === 'lost') clearSave();
-    else writeSave({ version: 1, sim: snapshot(this.sim), palette: this.palette.name, camera: this.gfx.rig.pose() });
+    else
+      writeSave({
+        version: 1,
+        sim: snapshot(this.sim),
+        palette: this.palette.name,
+        camera: this.gfx.rig.pose(),
+      });
     this.savedRev = this.sim.state.rev.save;
   }
 
@@ -130,7 +136,10 @@ export class Game {
     return card;
   }
 
-  /** The postcard pose: rotation 0, centred on the built tiles, zoomed so they fill the frame. */
+  /**
+   * The postcard pose: rotation 0, centred on the built tiles, zoomed so they fill the frame.
+   * Moves the camera to measure, so restore the pose afterwards.
+   */
   private fitBuiltArea(): CameraPose {
     const s = this.sim.state;
     let x0 = MAP_SIZE;
@@ -144,12 +153,23 @@ export class Game {
       x1 = Math.max(x1, xOf(tile) + 1);
       y1 = Math.max(y1, yOf(tile) + 1);
     }
-    if (x1 < 0) return { x: MAP_SIZE / 2, z: MAP_SIZE / 2, zoom: 44, rotation: 0 };
-    const span = x1 - x0 + (y1 - y0);
-    const aspect = this.gfx.canvas.clientWidth / Math.max(1, this.gfx.canvas.clientHeight);
-    // At 45 degrees the box projects to a diamond span/sqrt2 wide and about 0.58 of that tall.
-    const zoom = Math.max(0.21 * span, (0.36 * span) / aspect) * 1.15 + 3;
-    return { x: (x0 + x1) / 2, z: (y0 + y1) / 2, zoom, rotation: 0 };
+    if (x1 < 0) return { x: MAP_SIZE / 2, z: MAP_SIZE / 2, zoom: ZOOM_MAX, rotation: 0 };
+    const rig = this.gfx.rig;
+    const pose = { x: (x0 + x1) / 2, z: (y0 + y1) / 2, zoom: FIT_ZOOM, rotation: 0 };
+    rig.setPose(pose);
+    // Orthographic screen extent scales with 1 / zoom, so one measurement gives the fitting zoom.
+    let extent = 0;
+    for (const [x, z] of [
+      [x0, y0],
+      [x1, y0],
+      [x0, y1],
+      [x1, y1],
+    ]) {
+      const ndc = rig.project(x, z);
+      extent = Math.max(extent, Math.abs(ndc.x), Math.abs(ndc.y));
+    }
+    // A little margin, plus room for the tallest roofs and the title card.
+    return { ...pose, zoom: FIT_ZOOM * extent * 1.1 + 2 };
   }
 
   dispose(): void {
@@ -174,7 +194,7 @@ export class Game {
 
   private lightForTimeOfDay(): void {
     const dayTime = this.sim.state.day + this.dayClock / DAY_SECONDS;
-    const light = daylight((dayTime % CYCLE_DAYS) / CYCLE_DAYS + START_PHASE);
+    const light = daylight(dayTime / CYCLE_DAYS);
     this.gfx.setDaylight(light);
     this.buildings.setNight(light.night);
   }
@@ -211,6 +231,9 @@ function drawTitleCard(
   title: string,
   subtitle: string,
 ): void {
+  const style = getComputedStyle(document.documentElement);
+  const token = (name: string): string => style.getPropertyValue(name).trim();
+  const font = token('--font');
   const scale = width / 1440;
   const pad = 40 * scale;
   const cardW = 520 * scale;
@@ -219,19 +242,18 @@ function drawTitleCard(
   const y = height - pad - cardH;
   ctx.fillStyle = 'rgba(28, 24, 20, 0.12)';
   ctx.fillRect(x + 6 * scale, y + 8 * scale, cardW, cardH);
-  ctx.fillStyle = '#f6efe2';
+  ctx.fillStyle = token('--paper');
   ctx.fillRect(x, y, cardW, cardH);
-  ctx.fillStyle = '#d5473a';
+  ctx.fillStyle = token('--accent');
   ctx.fillRect(x, y, 8 * scale, cardH);
-  ctx.fillStyle = '#1c1814';
-  ctx.font = `500 ${44 * scale}px 'Jost Variable', 'Futura', sans-serif`;
-  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = token('--ink');
+  ctx.font = `500 ${44 * scale}px ${font}`;
   ctx.fillText(title, x + 32 * scale, y + 68 * scale);
-  ctx.font = `400 ${22 * scale}px 'Jost Variable', 'Futura', sans-serif`;
-  ctx.fillStyle = '#6b625a';
+  ctx.font = `400 ${22 * scale}px ${font}`;
+  ctx.fillStyle = token('--ink-soft');
   ctx.fillText(subtitle, x + 32 * scale, y + 108 * scale);
-  ctx.font = `600 ${14 * scale}px 'Jost Variable', 'Futura', sans-serif`;
-  ctx.fillStyle = '#1c1814';
+  ctx.font = `600 ${14 * scale}px ${font}`;
+  ctx.fillStyle = token('--ink');
   ctx.letterSpacing = `${3 * scale}px`;
   ctx.fillText('TOWNLET', x + cardW - 120 * scale, y + cardH - 24 * scale);
 }

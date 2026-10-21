@@ -1,46 +1,29 @@
 import { describe, expect, it } from 'vitest';
+import type { Difficulty } from '../src/sim/difficulty';
 import { autoplay } from './autoplayer';
 
 const SEEDS = ['budapest', 'moonrise'];
 const MONTHS = 240;
 /** Months a sensible mayor should need, give or take: a short, a medium and a long evening. */
-const BOUND = { easy: 40, normal: 80, hard: 160 };
+const BOUND: Record<Difficulty, [min: number, max: number]> = {
+  easy: [0, 40],
+  normal: [0, 80],
+  hard: [40, 160],
+};
+const RUNS = (Object.keys(BOUND) as Difficulty[]).flatMap((d) => SEEDS.map((s) => [d, s] as const));
 
 describe('a sensible mayor', () => {
-  it.each(SEEDS)(
-    'wins on easy without ever losing (%s)',
-    (seed) => {
-      const { sim, wonAt, lostAt } = autoplay('easy', seed, MONTHS);
+  it.each(RUNS)(
+    'wins on %s within bounds (%s)',
+    (difficulty, seed) => {
+      const { sim, wonAt, lostAt } = autoplay(difficulty, seed, MONTHS);
       console.log(
-        `easy ${seed}: won ${wonAt}, pop ${sim.state.population}, money ${Math.round(sim.state.money)}`,
+        `${difficulty} ${seed}: won ${wonAt}, lost ${lostAt}, pop ${sim.state.population}, money ${Math.round(sim.state.money)}`,
       );
+      const [min, max] = BOUND[difficulty];
       expect(lostAt).toBeUndefined();
-      expect(wonAt).toBeLessThanOrEqual(BOUND.easy);
-    },
-    120000,
-  );
-
-  it.each(SEEDS)(
-    'wins on normal (%s)',
-    (seed) => {
-      const { sim, wonAt, lostAt } = autoplay('normal', seed, MONTHS);
-      console.log(
-        `normal ${seed}: won ${wonAt}, lost ${lostAt}, pop ${sim.state.population}, money ${Math.round(sim.state.money)}`,
-      );
-      expect(wonAt).toBeLessThanOrEqual(BOUND.normal);
-    },
-    120000,
-  );
-
-  it.each(SEEDS)(
-    'wins on hard (%s)',
-    (seed) => {
-      const { sim, wonAt, lostAt } = autoplay('hard', seed, MONTHS);
-      console.log(
-        `hard ${seed}: won ${wonAt}, lost ${lostAt}, pop ${sim.state.population}, money ${Math.round(sim.state.money)}`,
-      );
-      expect(wonAt).toBeLessThanOrEqual(BOUND.hard);
-      expect(wonAt).toBeGreaterThan(BOUND.normal / 2);
+      expect(wonAt).toBeGreaterThan(min);
+      expect(wonAt).toBeLessThanOrEqual(max);
     },
     120000,
   );

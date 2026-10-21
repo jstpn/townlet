@@ -1,12 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { boot } from './boot';
 
 test('boots, lays a road by dragging across land, and renders without errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
-  await page.goto('/?seed=budapest');
+  await boot(page, '?seed=budapest');
   await expect(page.locator('#scene')).toBeVisible();
-  await page.getByRole('button', { name: 'Found the town' }).click();
-  await page.waitForFunction(() => window.townlet !== undefined);
   await page.waitForTimeout(400);
 
   // Find a run of five grass tiles near the middle of the map and its screen position.
@@ -64,9 +63,7 @@ test('boots, lays a road by dragging across land, and renders without errors', a
 });
 
 test('autosaves after a command and continues from the save', async ({ page }) => {
-  await page.goto('/?seed=moonrise&palette=darjeeling');
-  await page.getByRole('button', { name: 'Found the town' }).click();
-  await page.waitForFunction(() => window.townlet !== undefined);
+  await boot(page, '?seed=moonrise&palette=darjeeling');
   await page.waitForTimeout(300);
   const before = await page.evaluate(() => {
     const { sim } = window.townlet;
@@ -92,9 +89,7 @@ test('autosaves after a command and continues from the save', async ({ page }) =
 });
 
 test('the pause menu postcard downloads a PNG', async ({ page }) => {
-  await page.goto('/?seed=budapest');
-  await page.getByRole('button', { name: 'Found the town' }).click();
-  await page.waitForFunction(() => window.townlet !== undefined);
+  await boot(page, '?seed=budapest');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Menu' }).click();
   const download = page.waitForEvent('download');

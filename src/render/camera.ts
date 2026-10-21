@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { MAP_SIZE, inBounds, type Point } from '../sim/grid';
+import { MAP_SIZE, inBounds, mod, type Point } from '../sim/grid';
 
 const PITCH = THREE.MathUtils.degToRad(35.264);
 const DISTANCE = 140;
 const ZOOM_MIN = 6;
-const ZOOM_MAX = 44;
+export const ZOOM_MAX = 44;
 const SETTLED = 1e-4;
 
 /** Where the camera looks, for saving. */
@@ -34,14 +34,19 @@ export class CameraRig {
   }
 
   pose(): CameraPose {
-    return { x: this.target.x, z: this.target.z, zoom: this.zoomTarget, rotation: this.rotationIndex };
+    return {
+      x: this.target.x,
+      z: this.target.z,
+      zoom: this.zoomTarget,
+      rotation: this.rotationIndex,
+    };
   }
 
   /** Jumps straight to a saved pose, with no easing. */
   setPose(pose: CameraPose): void {
     this.target.set(pose.x, 0, pose.z);
     this.zoom = this.zoomTarget = THREE.MathUtils.clamp(pose.zoom, ZOOM_MIN, ZOOM_MAX);
-    this.rotationIndex = ((pose.rotation % 4) + 4) % 4;
+    this.rotationIndex = mod(pose.rotation, 4);
     this.yaw = this.yawTarget = Math.PI / 4 + (this.rotationIndex * Math.PI) / 2;
     this.apply();
   }
@@ -52,7 +57,7 @@ export class CameraRig {
   }
 
   rotate(direction: 1 | -1): void {
-    this.rotationIndex = (this.rotationIndex + direction + 4) % 4;
+    this.rotationIndex = mod(this.rotationIndex + direction, 4);
     this.yawTarget += (direction * Math.PI) / 2;
   }
 
@@ -145,6 +150,7 @@ export class CameraRig {
       this.target.z + Math.sin(yaw) * Math.cos(PITCH) * DISTANCE,
     );
     c.lookAt(this.target);
+    c.updateMatrixWorld();
     c.updateProjectionMatrix();
   }
 }

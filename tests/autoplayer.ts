@@ -1,6 +1,22 @@
-import { BUILDINGS, type BuildingKind, type Service } from '../src/sim/catalogue';
+import {
+  BUILDINGS,
+  type BuildingKind,
+  ROAD_COST,
+  type Service,
+  ZONE_COST,
+} from '../src/sim/catalogue';
 import type { Difficulty } from '../src/sim/difficulty';
-import { MAP_SIZE, TILE_COUNT, idx, inBounds, labelRegions, xOf, yOf } from '../src/sim/grid';
+import {
+  MAP_SIZE,
+  type Point,
+  TILE_COUNT,
+  idx,
+  inBounds,
+  labelRegions,
+  mod,
+  xOf,
+  yOf,
+} from '../src/sim/grid';
 import { DAYS_PER_MONTH, Sim } from '../src/sim/sim';
 import { Terrain, Zone, type ZoneKind } from '../src/sim/types';
 
@@ -17,7 +33,12 @@ const WANTS: [Service, BuildingKind][] = [
   ['park', 'park'],
 ];
 
-export type Autoplay = { sim: Sim; wonAt: number | undefined; lostAt: number | undefined };
+export type Autoplay = {
+  sim: Sim;
+  hall: Point;
+  wonAt: number | undefined;
+  lostAt: number | undefined;
+};
 
 /**
  * A headless mayor: founds near the centre of the mainland, grows a road grid outward one ring a
@@ -42,7 +63,7 @@ export function autoplay(difficulty: Difficulty, seed: string, months: number): 
     }
     if (wonAt !== undefined) break;
   }
-  return { sim, wonAt, lostAt };
+  return { sim, hall, wonAt, lostAt };
 }
 
 /** Share of residential lots with something built on them. */
@@ -58,7 +79,7 @@ function developedShare(sim: Sim): number {
   return zoned === 0 ? 1 : developed / zoned;
 }
 
-function foundTown(sim: Sim): { x: number; y: number } | undefined {
+function foundTown(sim: Sim): Point | undefined {
   const terrain = sim.state.terrain;
   const { label, sizes } = labelRegions((tile) => terrain[tile] !== Terrain.Water);
   const mainland = sizes.indexOf(Math.max(...sizes));
@@ -78,30 +99,24 @@ const dist = (tile: number, c: number): number =>
   Math.hypot(xOf(tile) - c + 0.5, yOf(tile) - c + 0.5);
 
 /** One month of mayoring within `radius` tiles of the hall. */
-function expand(sim: Sim, hall: { x: number; y: number }, radius: number): void {
+function expand(sim: Sim, hall: Point, radius: number): void {
   const s = sim.state;
   const gx = hall.x - 1;
   const gy = hall.y - 1;
-  const onGrid = (v: number, g: number): boolean => (((v - g) % BLOCK) + BLOCK) % BLOCK === 0;
+  const onGrid = (v: number, g: number): boolean => (v - g) % BLOCK === 0;
   const x0 = Math.max(0, hall.x - radius);
   const y0 = Math.max(0, hall.y - radius);
   const x1 = Math.min(MAP_SIZE - 1, hall.x + radius);
   const y1 = Math.min(MAP_SIZE - 1, hall.y + radius);
   const afford = (cost: number): boolean => s.money - sim.price(cost) > RESERVE;
 
-  // Roads: every grid segment inside the box, one block at a time so water only blocks its own stretch.
+  // Roads: from every grid intersection, one block east and one south, so water only blocks its own stretch.
   for (let y = y0; y <= y1; y++) {
     if (!onGrid(y, gy)) continue;
-    for (let x = x0; x < x1; x += 1) {
-      if (!onGrid(x, gx) || !afford(BLOCK * 10)) continue;
-      sim.placeRoadLine(x, y, Math.min(x1, x + BLOCK), y);
-    }
-  }
-  for (let x = x0; x <= x1; x++) {
-    if (!onGrid(x, gx)) continue;
-    for (let y = y0; y < y1; y += 1) {
-      if (!onGrid(y, gy) || !afford(BLOCK * 10)) continue;
-      sim.placeRoadLine(x, y, x, Math.min(y1, y + BLOCK));
+    for (let x = x0; x <= x1; x++) {
+      if (!onGrid(x, gx)) continue;
+      if (x < x1 && afford(BLOCK * ROAD_COST)) sim.placeRoadLine(x, y, Math.min(x1, x + BLOCK), y);
+      if (y < y1 && afford(BLOCK * ROAD_COST)) sim.placeRoadLine(x, y, x, Math.min(y1, y + BLOCK));
     }
   }
 
@@ -110,11 +125,11 @@ function expand(sim: Sim, hall: { x: number; y: number }, radius: number): void 
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
       const tile = idx(x, y);
-      if (s.zone[tile] !== Zone.None || s.road[tile] || s.buildingId[tile] !== -1) continue;
-      if (s.terrain[tile] === Terrain.Water || !access[tile] || !afford(5)) continue;
+      // The sim refuses roads, buildings and water itself; only reach and price are the mayor's call.
+      if (s.zone[tile] !== Zone.None || !access[tile] || !afford(ZONE_COST)) continue;
       const bx = Math.floor((x - gx) / BLOCK);
       const by = Math.floor((y - gy) / BLOCK);
-      const k = (((bx * 2 + by * 3) % 5) + 5) % 5;
+      const k = mod(bx * 2 + by * 3, 5);
       const zone: ZoneKind = k < 3 ? Zone.Residential : k === 3 ? Zone.Commercial : Zone.Industrial;
       sim.zoneRect(zone, x, y, x, y);
     }
@@ -125,13 +140,11 @@ function expand(sim: Sim, hall: { x: number; y: number }, radius: number): void 
   for (const [service, kind] of WANTS) {
     if (bought >= 3 || !afford(BUILDINGS[kind].cost)) continue;
     const coverage = sim.fields().coverage[service];
-    let target = -1;
     const utility = service === 'power' || service === 'water';
-    for (let tile = 0; tile < TILE_COUNT && target < 0; tile++) {
-      // Utilities go wherever a lot waits for them; the rest go where homes are zoned.
-      const wantsIt = utility ? s.zone[tile] !== Zone.None : s.zone[tile] === Zone.Residential;
-      if (wantsIt && !coverage[tile]) target = tile;
-    }
+    // Utilities go wherever a lot waits for them; the rest go where homes are zoned.
+    const target = s.zone.findIndex(
+      (zone, tile) => (utility ? zone !== Zone.None : zone === Zone.Residential) && !coverage[tile],
+    );
     if (target < 0) continue;
     if (buildNear(sim, kind, xOf(target), yOf(target))) bought++;
   }

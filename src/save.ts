@@ -4,13 +4,13 @@ import { isDifficulty } from './sim/difficulty';
 import { TILE_COUNT } from './sim/grid';
 import { SNAPSHOT_GRIDS, type SimSnapshot } from './sim/save';
 
-const KEY = 'townlet:autosave';
+export const SAVE_KEY = 'townlet:autosave';
 
 export type SaveFile = { version: 1; sim: SimSnapshot; palette: PaletteName; camera: CameraPose };
 
 export function writeSave(file: SaveFile): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(file));
+    localStorage.setItem(SAVE_KEY, JSON.stringify(file));
   } catch {
     // Private mode or a full quota: the game simply runs without an autosave.
   }
@@ -26,13 +26,13 @@ function isSaveFile(file: Partial<SaveFile>): file is SaveFile {
 }
 
 export function clearSave(): void {
-  localStorage.removeItem(KEY);
+  localStorage.removeItem(SAVE_KEY);
 }
 
 /** The autosave, if there is one this build can read. */
 export function readSave(): SaveFile | undefined {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return undefined;
     const file = JSON.parse(raw) as Partial<SaveFile>;
     return isSaveFile(file) ? file : undefined;

@@ -1,30 +1,30 @@
-import { expect, test } from '@playwright/test';
+import { test } from '@playwright/test';
+import { CYCLE_DAYS, MIDNIGHT } from '../src/render/daylight';
+import { SAVE_KEY, type SaveFile } from '../src/save';
 import { snapshot } from '../src/sim/save';
 import { autoplay } from '../tests/autoplayer';
+import { boot } from './boot';
 
 /** README pictures: a grown town in every palette, by day and night. Run with `npm run shots`. */
 test('takes the README screenshots @shots', async ({ page }) => {
-  const { sim } = autoplay('normal', 'budapest', 26);
-  // Day 720 is morning in the 120-day light cycle; 78 days later is the middle of the night.
-  sim.state.day = 720;
-  const hall = [...sim.state.buildings.values()].find((b) => b.kind === 'townHall');
-  expect(hall).toBeDefined();
-  const save = {
+  const { sim, hall } = autoplay('normal', 'budapest', 26);
+  // A whole number of light cycles in, so the first shots are in full day.
+  sim.state.day = CYCLE_DAYS * 6;
+  const save: SaveFile = {
     version: 1,
     sim: snapshot(sim),
     palette: 'budapest',
-    camera: { x: (hall?.x ?? 32) + 1, z: (hall?.y ?? 32) + 3, zoom: 17, rotation: 0 },
+    camera: { x: hall.x + 1, z: hall.y + 3, zoom: 17, rotation: 0 },
   };
   await page.addInitScript(
-    (value) => localStorage.setItem('townlet:autosave', value),
-    JSON.stringify(save),
+    ([key, value]) => localStorage.setItem(key, value),
+    [SAVE_KEY, JSON.stringify(save)],
   );
-  await page.goto('/');
   const shot = (name: string): Promise<Buffer> =>
     page.screenshot({ path: `docs/screenshots/${name}.jpg`, type: 'jpeg', quality: 84 });
+  await page.goto('/');
   await shot('start');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.waitForFunction(() => window.townlet !== undefined);
+  await boot(page, '', 'Continue');
   await page.evaluate(() => {
     window.townlet.speed = 0;
   });
@@ -39,10 +39,13 @@ test('takes the README screenshots @shots', async ({ page }) => {
     await page.waitForTimeout(600);
     await shot(palette);
   }
-  await page.evaluate(() => {
-    window.townlet.setPalette('budapest');
-    window.townlet.sim.state.day += 78;
-  });
+  await page.evaluate(
+    ([days]) => {
+      window.townlet.setPalette('budapest');
+      window.townlet.sim.state.day += days;
+    },
+    [Math.round(MIDNIGHT * CYCLE_DAYS)],
+  );
   await page.waitForTimeout(600);
   await shot('night');
 });

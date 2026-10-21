@@ -8,7 +8,6 @@ export const GradeShader = {
     nightColor: { value: new THREE.Color('#4a3b63') },
     night: { value: 0 },
     time: { value: 0 },
-    grain: { value: 0.014 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -22,7 +21,7 @@ export const GradeShader = {
     uniform vec3 nightColor;
     uniform float night;
     uniform float time;
-    uniform float grain;
+    const float GRAIN = 0.014;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -36,7 +35,7 @@ export const GradeShader = {
       vec3 col = mix(c.rgb, dim, night * 0.65);
       float d = distance(vUv, vec2(0.5));
       col *= 1.0 - smoothstep(0.4, 0.95, d) * 0.22;
-      col += (hash(vUv * 1024.0 + fract(time)) - 0.5) * grain;
+      col += (hash(vUv * 1024.0 + fract(time)) - 0.5) * GRAIN;
       gl_FragColor = vec4(col, c.a);
     }
   `,
