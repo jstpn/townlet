@@ -26,7 +26,7 @@ Spec: tasks/spec.md. Tick as you go. Review rounds after every 3 or 4 code commi
 
 ## Stretch, in order
 
-- [ ] Boats and birds
+- [x] Boats and birds
 - [ ] Hills with terraces
 - [ ] Synthesised audio
 - [ ] Touch controls

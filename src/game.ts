@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { CameraControls } from './input/controls';
 import { Pointer } from './input/pointer';
 import { BuildTool } from './input/tools';
+import { BirdLayer } from './render/birds';
+import { BoatLayer } from './render/boats';
 import { BuildingLayer } from './render/buildings';
 import { CarLayer } from './render/cars';
 import { CursorLayer } from './render/cursor';
@@ -48,6 +50,8 @@ export class Game {
     this.buildings,
     new CarLayer(),
     new FireLayer(),
+    new BoatLayer(),
+    new BirdLayer(),
   ];
   private readonly cursor = new CursorLayer();
   private readonly ring = new CursorLayer();
