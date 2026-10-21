@@ -60,7 +60,7 @@ export class Game {
   private readonly ring = new CursorLayer();
   private readonly pointer: Pointer;
   private readonly controls: CameraControls;
-  private readonly clock = new THREE.Clock();
+  private readonly timer = new THREE.Timer();
   /** Sim speed multiplier: 0 pauses, 1 to 3 run. One day lasts half a second at 1x. */
   speed = 1;
   private dayClock = 0;
@@ -191,7 +191,8 @@ export class Game {
   }
 
   private readonly frame = (): void => {
-    const dt = Math.min(this.clock.getDelta(), 0.1);
+    this.timer.update();
+    const dt = Math.min(this.timer.getDelta(), 0.1);
     this.controls.update(dt);
     this.gfx.rig.update(dt);
     this.tool.update();

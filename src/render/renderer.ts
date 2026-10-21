@@ -36,7 +36,7 @@ export class GameRenderer {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // The sun is static, so the shadow pass only runs when geometry changes.
     this.renderer.shadowMap.autoUpdate = false;
     this.renderer.toneMapping = THREE.NoToneMapping;
