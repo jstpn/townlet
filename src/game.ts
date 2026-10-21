@@ -96,6 +96,7 @@ export class Game {
     this.gfx.rig.update(dt);
     this.tool.update();
     this.tick(dt);
+    for (const layer of this.layers) layer.animate?.(dt);
     this.onFrame?.();
     this.syncLayers();
     this.gfx.render();

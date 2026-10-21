@@ -74,6 +74,37 @@ export class GeometryBuilder {
     this.vertex(dx, dy, dz, nx, ny, nz, color);
   }
 
+  /** Triangle a-b-c, counter-clockwise seen from the front; the normal comes from the winding. */
+  tri(
+    ax: number,
+    ay: number,
+    az: number,
+    bx: number,
+    by: number,
+    bz: number,
+    cx: number,
+    cy: number,
+    cz: number,
+    color: THREE.Color,
+  ): void {
+    const ux = bx - ax;
+    const uy = by - ay;
+    const uz = bz - az;
+    const vx = cx - ax;
+    const vy = cy - ay;
+    const vz = cz - az;
+    let nx = uy * vz - uz * vy;
+    let ny = uz * vx - ux * vz;
+    let nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len;
+    ny /= len;
+    nz /= len;
+    this.vertex(ax, ay, az, nx, ny, nz, color);
+    this.vertex(bx, by, bz, nx, ny, nz, color);
+    this.vertex(cx, cy, cz, nx, ny, nz, color);
+  }
+
   /** Horizontal square facing up, from (x0, z0) to (x1, z1) at height y. */
   floor(x0: number, z0: number, x1: number, z1: number, y: number, color: THREE.Color): void {
     this.quad(x0, y, z0, x0, y, z1, x1, y, z1, x1, y, z0, 0, 1, 0, color);
