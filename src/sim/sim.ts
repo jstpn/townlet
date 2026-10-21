@@ -23,6 +23,8 @@ export type SimOptions = {
   terrain?: Uint8Array;
   /** Override the starting money, for tests. */
   money?: number;
+  /** Resume the random sequence from a save. */
+  rngState?: number;
 };
 
 export type CommandError =
@@ -114,7 +116,7 @@ export class Sim {
 
   constructor(options: SimOptions) {
     const settings = DIFFICULTY[options.difficulty];
-    this.rng = createRng(options.seed + ':sim');
+    this.rng = createRng(options.seed + ':sim', options.rngState);
     this.state = {
       seed: options.seed,
       difficulty: options.difficulty,
@@ -142,6 +144,11 @@ export class Sim {
       announced: new Set(),
       rev: { terrain: 0, roads: 0, zones: 0, buildings: 0, fire: 0 },
     };
+  }
+
+  /** Random sequence position, for saving. */
+  get rngState(): number {
+    return this.rng.state();
   }
 
   /** Advances one game day: demand, happiness, growth on every lot, and the budget on month days. */

@@ -1,6 +1,7 @@
 import './style.css';
 import { Game, type GameOptions } from './game';
 import { isPaletteName } from './render/palette';
+import { clearSave, readSave } from './save';
 import { isDifficulty } from './sim/difficulty';
 import { Hud } from './ui/hud';
 import { showStartScreen } from './ui/startScreen';
@@ -31,12 +32,20 @@ const defaults: Partial<GameOptions> = {
 };
 
 async function run(initial: Partial<GameOptions>): Promise<void> {
-  const options = await showStartScreen(hudRoot, initial);
-  const game = new Game(canvas, options);
+  const saved = readSave();
+  const choice = await showStartScreen(hudRoot, initial, saved !== undefined);
+  const options: GameOptions =
+    choice === 'continue' && saved
+      ? { seed: saved.sim.seed, difficulty: saved.sim.difficulty, palette: saved.palette }
+      : choice === 'continue'
+        ? { seed: '', difficulty: 'normal', palette: 'budapest' }
+        : choice;
+  const game = new Game(canvas, options, choice === 'continue' ? saved : undefined);
   const hud = new Hud(hudRoot, game, {
     onNewTown: () => {
       hud.dispose();
       game.dispose();
+      clearSave();
       void run({ ...options, seed: undefined });
     },
   });

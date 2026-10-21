@@ -7,6 +7,9 @@ const ZOOM_MIN = 6;
 const ZOOM_MAX = 44;
 const SETTLED = 1e-4;
 
+/** Where the camera looks, for saving. */
+export type CameraPose = { x: number; z: number; zoom: number; rotation: number };
+
 /** Orthographic camera on a rail: four snap rotations, smooth zoom, a ground target. */
 export class CameraRig {
   readonly camera: THREE.OrthographicCamera;
@@ -27,6 +30,19 @@ export class CameraRig {
 
   constructor() {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 400);
+    this.apply();
+  }
+
+  pose(): CameraPose {
+    return { x: this.target.x, z: this.target.z, zoom: this.zoomTarget, rotation: this.rotationIndex };
+  }
+
+  /** Jumps straight to a saved pose, with no easing. */
+  setPose(pose: CameraPose): void {
+    this.target.set(pose.x, 0, pose.z);
+    this.zoom = this.zoomTarget = THREE.MathUtils.clamp(pose.zoom, ZOOM_MIN, ZOOM_MAX);
+    this.rotationIndex = ((pose.rotation % 4) + 4) % 4;
+    this.yaw = this.yawTarget = Math.PI / 4 + (this.rotationIndex * Math.PI) / 2;
     this.apply();
   }
 

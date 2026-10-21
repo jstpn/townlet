@@ -27,11 +27,12 @@ const randomSeed = (): string => {
   return `${pick()}-${pick()}-${Math.floor(Math.random() * 1000)}`;
 };
 
-/** The title screen. Resolves once the player founds a town. */
+/** The title screen. Resolves with a new town's options, or 'continue' to resume the autosave. */
 export function showStartScreen(
   root: HTMLElement,
   defaults: Partial<GameOptions>,
-): Promise<GameOptions> {
+  canContinue: boolean,
+): Promise<GameOptions | 'continue'> {
   return new Promise((resolve) => {
     let difficulty: Difficulty = defaults.difficulty ?? 'normal';
     let palette: PaletteName = defaults.palette ?? 'budapest';
@@ -68,6 +69,10 @@ export function showStartScreen(
       screen.remove();
       resolve({ seed: seed.value.trim() || randomSeed(), difficulty, palette });
     };
+    const resume = (): void => {
+      screen.remove();
+      resolve('continue');
+    };
 
     const screen = el(
       'div.start',
@@ -89,7 +94,12 @@ export function showStartScreen(
             el('button.ghost', { onclick: () => (seed.value = randomSeed()) }, 'Randomise'),
           ),
         ),
-        el('div.start-actions', {}, el('button.primary', { onclick: found }, 'Found the town')),
+        el(
+          'div.start-actions',
+          {},
+          ...(canContinue ? [el('button.primary', { onclick: resume }, 'Continue')] : []),
+          el(`button.${canContinue ? 'ghost' : 'primary'}`, { onclick: found }, 'Found the town'),
+        ),
       ),
     );
     seed.addEventListener('keydown', (e) => {

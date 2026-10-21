@@ -62,3 +62,31 @@ test('boots, lays a road by dragging across land, and renders without errors', a
   await page.screenshot({ path: 'e2e/screenshots/boot.png' });
   expect(errors).toEqual([]);
 });
+
+test('autosaves after a command and continues from the save', async ({ page }) => {
+  await page.goto('/?seed=moonrise&palette=darjeeling');
+  await page.getByRole('button', { name: 'Found the town' }).click();
+  await page.waitForFunction(() => window.townlet !== undefined);
+  await page.waitForTimeout(300);
+  const before = await page.evaluate(() => {
+    const { sim } = window.townlet;
+    sim.state.terrain.fill(2);
+    sim.placeBuilding('townHall', 30, 30);
+    sim.placeRoadLine(20, 33, 40, 33);
+    window.townlet.gfx.rig.rotate(1);
+    window.townlet.save();
+    return { day: sim.state.day, roads: sim.state.road.filter((r) => r === 1).length };
+  });
+  expect(before.roads).toBe(21);
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.waitForFunction(() => window.townlet !== undefined);
+  const after = await page.evaluate(() => ({
+    roads: window.townlet.sim.state.road.filter((r) => r === 1).length,
+    founded: window.townlet.sim.state.founded,
+    palette: window.townlet.paletteName,
+    rotation: window.townlet.gfx.rig.rotationIndex,
+  }));
+  expect(after).toEqual({ roads: 21, founded: true, palette: 'darjeeling', rotation: 1 });
+});

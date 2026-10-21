@@ -22,9 +22,9 @@ export function hashSeed(seed: string): number {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
-/** mulberry32: small, fast, good enough for a game. */
-export function createRng(seed: string): Rng {
-  let s = hashSeed(seed);
+/** mulberry32: small, fast, good enough for a game. Pass a saved `state` to resume a sequence. */
+export function createRng(seed: string, state?: number): Rng {
+  let s = state ?? hashSeed(seed);
   const next = (): number => {
     s = (s + 0x6d2b79f5) >>> 0;
     let t = s;
